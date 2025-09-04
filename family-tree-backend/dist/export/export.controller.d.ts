@@ -1,0 +1,54 @@
+import { Response } from 'express';
+import { ExportService } from './export.service';
+interface AuthenticatedRequest extends Request {
+    user: {
+        sub: string;
+        memberId: string;
+    };
+}
+interface ExportConfig {
+    formats: ('pdf' | 'excel')[];
+    familyTree: {
+        structure: 'folderTree' | 'traditional' | 'interactive';
+        includeMembersList: boolean;
+        memberDetails: ('parent' | 'children' | 'spouses' | 'personalInfo' | 'contact')[];
+    };
+}
+interface ExportRequest {
+    format: 'pdf' | 'excel';
+    scope: 'current-family' | 'all-families' | 'selected-families';
+    familyIds?: string[];
+    config: ExportConfig;
+    includeData: {
+        personalInfo: boolean;
+        relationships: boolean;
+        contactInfo: boolean;
+        profileImages: boolean;
+    };
+}
+interface FolderTreeExportData {
+    families: {
+        id: string;
+        name: string;
+        members: {
+            id: string;
+            name: string;
+            role: string;
+            generation: number;
+            parents: any[];
+            children: any[];
+            spouses: any[];
+            personalInfo?: any;
+        }[];
+    }[];
+    membersList: any[];
+    generatedAt: Date;
+    exportConfig: ExportConfig;
+}
+export declare class ExportController {
+    private exportService;
+    constructor(exportService: ExportService);
+    getFolderTreeData(req: AuthenticatedRequest): Promise<FolderTreeExportData>;
+    exportFamilyData(exportRequest: ExportRequest, req: AuthenticatedRequest, res: Response): Promise<void>;
+}
+export {};
