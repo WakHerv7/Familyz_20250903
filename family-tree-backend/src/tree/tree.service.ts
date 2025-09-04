@@ -1,20 +1,28 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { AuthenticatedUser } from "../auth/strategies/jwt.strategy";
 import {
   FamilyTreeDto,
   TreeNodeDto,
   TreeConnectionDto,
   ExportTreeDto,
   TreeStatisticsDto,
-  TreeFormat
-} from './dto/tree.dto';
+  TreeFormat,
+} from "./dto/tree.dto";
 
 @Injectable()
 export class TreeService {
   constructor(private prisma: PrismaService) {}
 
-  async getFamilyTree(user: AuthenticatedUser, familyId: string, centerMemberId?: string): Promise<FamilyTreeDto> {
+  async getFamilyTree(
+    user: AuthenticatedUser,
+    familyId: string,
+    centerMemberId?: string
+  ): Promise<FamilyTreeDto> {
     // Verify family access
     await this.verifyFamilyAccess(user, familyId);
 
@@ -25,7 +33,7 @@ export class TreeService {
     });
 
     if (!family) {
-      throw new NotFoundException('Family not found');
+      throw new NotFoundException("Family not found");
     }
 
     // Get all family members with privacy filtering
@@ -35,7 +43,10 @@ export class TreeService {
     const centerNodeId = centerMemberId || user.memberId || members[0]?.id;
 
     // Build tree structure
-    const { nodes, connections } = await this.buildTreeStructure(members, centerNodeId);
+    const { nodes, connections } = await this.buildTreeStructure(
+      members,
+      centerNodeId
+    );
 
     // Calculate statistics
     const totalMembers = members.length;
@@ -52,7 +63,10 @@ export class TreeService {
     };
   }
 
-  async getTreeStatistics(user: AuthenticatedUser, familyId: string): Promise<TreeStatisticsDto> {
+  async getTreeStatistics(
+    user: AuthenticatedUser,
+    familyId: string
+  ): Promise<TreeStatisticsDto> {
     await this.verifyFamilyAccess(user, familyId);
 
     const members = await this.getVisibleMembers(user, familyId);
@@ -60,10 +74,7 @@ export class TreeService {
     // Count families (including sub-families)
     const families = await this.prisma.family.findMany({
       where: {
-        OR: [
-          { id: familyId },
-          { parentFamilyId: familyId },
-        ],
+        OR: [{ id: familyId }, { parentFamilyId: familyId }],
       },
     });
 
@@ -73,31 +84,37 @@ export class TreeService {
 
     // Gender distribution
     const genderDistribution = {
-      male: members.filter(m => m.gender === 'MALE').length,
-      female: members.filter(m => m.gender === 'FEMALE').length,
-      other: members.filter(m => m.gender === 'OTHER').length,
-      unspecified: members.filter(m => !m.gender || m.gender === 'PREFER_NOT_TO_SAY').length,
+      male: members.filter((m) => m.gender === "MALE").length,
+      female: members.filter((m) => m.gender === "FEMALE").length,
+      other: members.filter((m) => m.gender === "OTHER").length,
+      unspecified: members.filter(
+        (m) => !m.gender || m.gender === "PREFER_NOT_TO_SAY"
+      ).length,
     };
 
     // Status distribution
     const statusDistribution = {
-      active: members.filter(m => m.status === 'ACTIVE').length,
-      inactive: members.filter(m => m.status === 'INACTIVE').length,
-      deceased: members.filter(m => m.status === 'DECEASED').length,
-      archived: members.filter(m => m.status === 'ARCHIVED').length,
+      active: members.filter((m) => m.status === "ACTIVE").length,
+      inactive: members.filter((m) => m.status === "INACTIVE").length,
+      deceased: members.filter((m) => m.status === "DECEASED").length,
+      archived: members.filter((m) => m.status === "ARCHIVED").length,
     };
 
     // Calculate average children per member
-    const totalChildren = members.reduce((sum, member) => sum + (member.children?.length || 0), 0);
-    const averageChildrenPerMember = totalMembers > 0 ? totalChildren / totalMembers : 0;
+    const totalChildren = members.reduce(
+      (sum, member) => sum + (member.children?.length || 0),
+      0
+    );
+    const averageChildrenPerMember =
+      totalMembers > 0 ? totalChildren / totalMembers : 0;
 
     // Find oldest and youngest members (if birth info is available)
     let oldestMember, youngestMember;
 
     for (const member of members) {
-      if (member.personalInfo && typeof member.personalInfo === 'object') {
+      if (member.personalInfo && typeof member.personalInfo === "object") {
         const birthYear = (member.personalInfo as any).birthYear;
-        if (typeof birthYear === 'number') {
+        if (typeof birthYear === "number") {
           if (!oldestMember || birthYear < oldestMember.birthYear!) {
             oldestMember = { id: member.id, name: member.name, birthYear };
           }
@@ -125,7 +142,10 @@ export class TreeService {
     };
   }
 
-  async exportFamilyTree(user: AuthenticatedUser, exportDto: ExportTreeDto): Promise<Buffer | string> {
+  async exportFamilyTree(
+    user: AuthenticatedUser,
+    exportDto: ExportTreeDto
+  ): Promise<Buffer | string> {
     await this.verifyFamilyAccess(user, exportDto.familyId);
 
     const treeData = await this.getFamilyTree(user, exportDto.familyId);
@@ -138,13 +158,16 @@ export class TreeService {
       case TreeFormat.PDF:
         return this.exportAsPdf(treeData, exportDto);
       default:
-        throw new Error('Unsupported export format');
+        throw new Error("Unsupported export format");
     }
   }
 
-  private async verifyFamilyAccess(user: AuthenticatedUser, familyId: string): Promise<void> {
+  private async verifyFamilyAccess(
+    user: AuthenticatedUser,
+    familyId: string
+  ): Promise<void> {
     if (!user.memberId) {
-      throw new NotFoundException('Member profile not found');
+      throw new NotFoundException("Member profile not found");
     }
 
     const membership = await this.prisma.familyMembership.findFirst({
@@ -156,11 +179,14 @@ export class TreeService {
     });
 
     if (!membership) {
-      throw new ForbiddenException('Access denied to this family');
+      throw new ForbiddenException("Access denied to this family");
     }
   }
 
-  private async getVisibleMembers(user: AuthenticatedUser, familyId: string): Promise<any[]> {
+  private async getVisibleMembers(
+    user: AuthenticatedUser,
+    familyId: string
+  ): Promise<any[]> {
     // Get all family members with relationships
     const memberships = await this.prisma.familyMembership.findMany({
       where: {
@@ -183,21 +209,22 @@ export class TreeService {
     const userFamilyIds = await this.getUserFamilyIds(user.memberId!);
 
     return memberships
-      .filter(membership => {
+      .filter((membership) => {
         // Always show if it's the same family
         if (membership.familyId === familyId) return true;
 
         // Check if user has access to this member through other families
         return userFamilyIds.includes(membership.familyId);
       })
-      .map(membership => ({
+      .map((membership) => ({
         ...membership.member,
         // Combine spouses arrays
         spouses: [
           ...membership.member.spouses,
           ...membership.member.spousesReverse,
-        ].filter((spouse, index, arr) =>
-          arr.findIndex(s => s.id === spouse.id) === index
+        ].filter(
+          (spouse, index, arr) =>
+            arr.findIndex((s) => s.id === spouse.id) === index
         ),
       }));
   }
@@ -211,10 +238,13 @@ export class TreeService {
       select: { familyId: true },
     });
 
-    return memberships.map(m => m.familyId);
+    return memberships.map((m) => m.familyId);
   }
 
-  private async buildTreeStructure(members: any[], centerNodeId: string): Promise<{
+  private async buildTreeStructure(
+    members: any[],
+    centerNodeId: string
+  ): Promise<{
     nodes: TreeNodeDto[];
     connections: TreeConnectionDto[];
   }> {
@@ -251,19 +281,21 @@ export class TreeService {
         connections.push({
           from: parent.id,
           to: member.id,
-          type: 'parent',
+          type: "parent",
           strength: 1.0,
         });
       });
 
       // Spouse connections
       member.spouses?.forEach((spouse: any) => {
-        if (!processedMembers.has(`${member.id}-${spouse.id}`) &&
-            !processedMembers.has(`${spouse.id}-${member.id}`)) {
+        if (
+          !processedMembers.has(`${member.id}-${spouse.id}`) &&
+          !processedMembers.has(`${spouse.id}-${member.id}`)
+        ) {
           connections.push({
             from: member.id,
             to: spouse.id,
-            type: 'spouse',
+            type: "spouse",
             strength: 0.8,
           });
           processedMembers.add(`${member.id}-${spouse.id}`);
@@ -275,7 +307,7 @@ export class TreeService {
         connections.push({
           from: member.id,
           to: child.id,
-          type: 'child',
+          type: "child",
           strength: 1.0,
         });
       });
@@ -284,17 +316,34 @@ export class TreeService {
     return { nodes, connections };
   }
 
-  private calculateNodePositions(members: any[], centerNodeId: string): Map<string, { x: number; y: number; level: number }> {
-    const positions = new Map<string, { x: number; y: number; level: number }>();
-    const memberMap = new Map(members.map(m => [m.id, m]));
+  private calculateNodePositions(
+    members: any[],
+    centerNodeId: string
+  ): Map<string, { x: number; y: number; level: number }> {
+    const positions = new Map<
+      string,
+      { x: number; y: number; level: number }
+    >();
+    const memberMap = new Map(members.map((m) => [m.id, m]));
 
-    // Simple hierarchical layout
+    // Family Tree Spacing Configuration - Doubled values for better visibility
+    const TREE_SPACING = {
+      levelWidth: 800, // Horizontal spacing between generations (doubled from 400)
+      levelHeight: 400, // Vertical spacing between levels (doubled from 200)
+      spouseSpacing: 300, // Horizontal spacing for spouses (doubled from 150)
+      minSiblingSpacing: 500, // Minimum spacing between siblings (doubled from 250)
+      spouseVerticalOffset: 50, // Vertical offset for spouses with no parents
+    };
+
+    // Simple hierarchical layout with increased spacing
     const visited = new Set<string>();
-    const levelWidth = 300;
-    const levelHeight = 150;
+    const levelWidth = TREE_SPACING.levelWidth;
+    const levelHeight = TREE_SPACING.levelHeight;
 
     // BFS to assign levels
-    const queue: Array<{ id: string; level: number; parentX?: number }> = [{ id: centerNodeId, level: 0 }];
+    const queue: Array<{ id: string; level: number; parentX?: number }> = [
+      { id: centerNodeId, level: 0 },
+    ];
     const levelCounts = new Map<number, number>();
 
     while (queue.length > 0) {
@@ -310,9 +359,27 @@ export class TreeService {
       const currentLevelCount = levelCounts.get(level) || 0;
       levelCounts.set(level, currentLevelCount + 1);
 
-      // Calculate position
-      const x = parentX !== undefined ? parentX : currentLevelCount * levelWidth;
-      const y = level * levelHeight;
+      // Calculate position with minimum spacing
+      const baseX =
+        parentX !== undefined ? parentX : currentLevelCount * levelWidth;
+      // Ensure minimum horizontal spacing between siblings
+      const minSpacing = TREE_SPACING.minSiblingSpacing; // Minimum pixels between nodes
+      const x = Math.max(
+        baseX,
+        (currentLevelCount - 1) * minSpacing + levelWidth / 2
+      );
+
+      // Calculate Y position - handle spouse vertical offset
+      let y = level * levelHeight;
+
+      // If this member has no parents and is being positioned as a spouse (has parentX),
+      // apply vertical offset to position them slightly below their counterpart
+      const hasNoParents = !member.parents || member.parents.length === 0;
+      const isSpousePosition = parentX !== undefined; // Indicates this is positioned relative to another member
+
+      if (hasNoParents && isSpousePosition) {
+        y += TREE_SPACING.spouseVerticalOffset;
+      }
 
       positions.set(id, { x, y, level });
 
@@ -330,10 +397,22 @@ export class TreeService {
         }
       });
 
-      // Add spouses to queue (same level)
+      // Add spouses to queue (same level) with increased spacing
       member.spouses?.forEach((spouse: any) => {
         if (!visited.has(spouse.id)) {
-          queue.push({ id: spouse.id, level, parentX: x + 100 });
+          // Check if spouse has no parents - if so, position slightly below
+          const spouseHasNoParents =
+            !spouse.parents || spouse.parents.length === 0;
+          const spouseLevel = spouseHasNoParents
+            ? level +
+              TREE_SPACING.spouseVerticalOffset / TREE_SPACING.levelHeight
+            : level;
+
+          queue.push({
+            id: spouse.id,
+            level: spouseLevel,
+            parentX: x + TREE_SPACING.spouseSpacing,
+          });
         }
       });
     }
@@ -341,17 +420,23 @@ export class TreeService {
     return positions;
   }
 
-  private calculateGenerations(nodes: TreeNodeDto[], centerNodeId: string): number {
-    const levels = nodes.map(node => node.level);
+  private calculateGenerations(
+    nodes: TreeNodeDto[],
+    centerNodeId: string
+  ): number {
+    const levels = nodes.map((node) => node.level);
     const minLevel = Math.min(...levels);
     const maxLevel = Math.max(...levels);
     return maxLevel - minLevel + 1;
   }
 
-  private exportAsJson(treeData: FamilyTreeDto, exportDto: ExportTreeDto): string {
+  private exportAsJson(
+    treeData: FamilyTreeDto,
+    exportDto: ExportTreeDto
+  ): string {
     const filteredData = {
       ...treeData,
-      nodes: treeData.nodes.map(node => ({
+      nodes: treeData.nodes.map((node) => ({
         ...node,
         ...(exportDto.includePersonalInfo ? {} : { personalInfo: undefined }),
       })),
@@ -360,43 +445,62 @@ export class TreeService {
     return JSON.stringify(filteredData, null, 2);
   }
 
-  private exportAsCsv(treeData: FamilyTreeDto, exportDto: ExportTreeDto): string {
+  private exportAsCsv(
+    treeData: FamilyTreeDto,
+    exportDto: ExportTreeDto
+  ): string {
     const headers = [
-      'ID', 'Name', 'Gender', 'Status', 'Level',
-      'Parents', 'Children', 'Spouses', 'Created', 'Updated'
+      "ID",
+      "Name",
+      "Gender",
+      "Status",
+      "Level",
+      "Parents",
+      "Children",
+      "Spouses",
+      "Created",
+      "Updated",
     ];
 
     if (exportDto.includePersonalInfo) {
-      headers.push('Personal Info');
+      headers.push("Personal Info");
     }
 
-    const rows = treeData.nodes.map(node => [
+    const rows = treeData.nodes.map((node) => [
       node.id,
       node.name,
-      node.gender || '',
+      node.gender || "",
       node.status,
       node.level.toString(),
-      node.parentIds.join(';'),
-      node.childrenIds.join(';'),
-      node.spouseIds.join(';'),
+      node.parentIds.join(";"),
+      node.childrenIds.join(";"),
+      node.spouseIds.join(";"),
       node.createdAt.toISOString(),
       node.updatedAt.toISOString(),
-      ...(exportDto.includePersonalInfo ? [JSON.stringify(node.personalInfo || {})] : []),
+      ...(exportDto.includePersonalInfo
+        ? [JSON.stringify(node.personalInfo || {})]
+        : []),
     ]);
 
-    return [headers, ...rows].map(row => row.join(',')).join('\n');
+    return [headers, ...rows].map((row) => row.join(",")).join("\n");
   }
 
-  private exportAsPdf(treeData: FamilyTreeDto, exportDto: ExportTreeDto): Buffer {
+  private exportAsPdf(
+    treeData: FamilyTreeDto,
+    exportDto: ExportTreeDto
+  ): Buffer {
     // This is a simplified implementation
     // In a real application, you would use a library like puppeteer or pdfkit
-    const content = `Family Tree: ${treeData.familyName}\n\n` +
+    const content =
+      `Family Tree: ${treeData.familyName}\n\n` +
       `Total Members: ${treeData.totalMembers}\n` +
       `Generations: ${treeData.generations}\n\n` +
-      treeData.nodes.map(node =>
-        `${node.name} (${node.gender || 'Unknown'}, ${node.status})`
-      ).join('\n');
+      treeData.nodes
+        .map(
+          (node) => `${node.name} (${node.gender || "Unknown"}, ${node.status})`
+        )
+        .join("\n");
 
-    return Buffer.from(content, 'utf-8');
+    return Buffer.from(content, "utf-8");
   }
 }

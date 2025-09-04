@@ -182,7 +182,7 @@ export const buildFamilyTreeStructure = (member: any): FamilyTreeNode => {
 // New function to build tree structure from tree API response
 export const buildFamilyTreeFromApiData = (treeData: {
   nodes: TreeNode[];
-  links: TreeLink[];
+  connections?: any[];
   metadata?: any;
 }): FamilyTreeNode | null => {
   if (!treeData.nodes || treeData.nodes.length === 0) {
@@ -190,8 +190,20 @@ export const buildFamilyTreeFromApiData = (treeData: {
   }
 
   console.log("🌳 Building tree from API data:");
-  console.log("📊 Nodes:", treeData.nodes.length);
-  console.log("🔗 Links:", treeData.links.length);
+  console.log("📊 Nodes:", treeData.nodes?.length);
+  console.log("🔗 Connections:", treeData.connections?.length);
+
+  // Ensure we have the required data
+  if (!treeData.nodes || !Array.isArray(treeData.nodes)) {
+    console.error("❌ No nodes data available");
+    return null;
+  }
+
+  if (!treeData.connections || !Array.isArray(treeData.connections)) {
+    console.warn(
+      "⚠️ No connections data available, building tree without relationships"
+    );
+  }
 
   // Create a map of nodes for quick lookup
   const nodeMap = new Map<string, TreeNode>();
@@ -202,18 +214,18 @@ export const buildFamilyTreeFromApiData = (treeData: {
   const spouseMap = new Map<string, TreeNode[]>();
   const childMap = new Map<string, TreeNode[]>();
 
-  // Process links to build relationships
-  treeData.links.forEach((link) => {
+  // Process connections to build relationships
+  treeData.connections?.forEach((connection: any) => {
     const sourceId =
-      typeof link.source === "string" ? link.source : link.source.id;
+      typeof connection.from === "string" ? connection.from : connection.from;
     const targetId =
-      typeof link.target === "string" ? link.target : link.target.id;
+      typeof connection.to === "string" ? connection.to : connection.to;
     const sourceNode = nodeMap.get(sourceId);
     const targetNode = nodeMap.get(targetId);
 
     if (!sourceNode || !targetNode) return;
 
-    switch (link.type) {
+    switch (connection.type) {
       case "parent":
         // source is parent of target
         if (!childMap.has(sourceNode.id)) childMap.set(sourceNode.id, []);

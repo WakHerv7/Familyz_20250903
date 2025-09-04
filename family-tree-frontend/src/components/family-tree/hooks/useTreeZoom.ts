@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import * as d3 from "d3";
 
-export const useTreeZoom = () => {
+export const useTreeZoom = (containerRef?: React.RefObject<HTMLDivElement>) => {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const handleZoomIn = () => {
@@ -51,11 +51,9 @@ export const useTreeZoom = () => {
   };
 
   const handleFitToScreen = () => {
-    if (svgRef.current && document.querySelector(".tree-container")) {
+    if (svgRef.current && containerRef?.current) {
       const svg = d3.select(svgRef.current);
-      const container = document.querySelector(
-        ".tree-container"
-      ) as HTMLElement;
+      const container = containerRef.current;
       const bounds = (
         svg.select(".main-group").node() as SVGGraphicsElement
       )?.getBBox();
@@ -86,11 +84,20 @@ export const useTreeZoom = () => {
     }
   };
 
+  const autoFitToScreen = () => {
+    // Automatically fit to screen after a short delay to ensure DOM is ready
+    console.log("🔄 Auto-fitting tree to screen...");
+    setTimeout(() => {
+      handleFitToScreen();
+    }, 100);
+  };
+
   return {
     svgRef,
     handleZoomIn,
     handleZoomOut,
     handleReset,
     handleFitToScreen,
+    autoFitToScreen,
   };
 };

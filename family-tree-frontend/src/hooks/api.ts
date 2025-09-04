@@ -44,9 +44,9 @@ export const useLogin = () => {
     onSuccess: (data: any) => {
       dispatch(
         loginSuccess({
-          user: data.data.user,
-          accessToken: data.data.accessToken,
-          refreshToken: data.data.refreshToken,
+          user: data?.user,
+          accessToken: data?.accessToken,
+          refreshToken: data?.refreshToken,
         })
       );
       queryClient.invalidateQueries({ queryKey: ["profile"] });
@@ -650,7 +650,16 @@ export const useUnreadNotificationCount = () => {
       return response;
     },
     enabled: isAuthenticated,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 60000, // Refetch every 60 seconds to avoid rate limiting
+    retry: (failureCount, error: any) => {
+      // Don't retry on 429 errors to avoid making it worse
+      if (error?.status === 429) {
+        return false;
+      }
+      // Retry up to 3 times for other errors
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 };
 
@@ -808,7 +817,7 @@ export const useFamilyTree = (
 
       const response = await apiClient.get<{
         nodes: any[];
-        links: any[];
+        connections: any[];
         metadata: {
           totalMembers: number;
           generations: number;
@@ -817,8 +826,21 @@ export const useFamilyTree = (
       }>(`/tree/${familyId}?${searchParams.toString()}`);
       return response;
     },
-    enabled: isAuthenticated && !!familyId,
+    enabled: isAuthenticated && !!familyId && familyId !== "default",
     staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: (failureCount, error: any) => {
+      // Don't retry on 403 (Forbidden) errors
+      if (error?.status === 403) {
+        return false;
+      }
+      // Don't retry on 404 (Not Found) errors
+      if (error?.status === 404) {
+        return false;
+      }
+      // Retry up to 3 times for other errors
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 };
 

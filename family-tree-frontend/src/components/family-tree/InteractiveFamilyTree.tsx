@@ -25,9 +25,14 @@ import {
 import { createHierarchicalLayout } from "./layouts";
 import { useTreeZoom } from "./hooks";
 import { FamilyTreeItem, TreeControls, TreeLegend } from "./components";
+import { TREE_SPACING } from "./config/spacing";
 
 // Import the new tree hooks
-import { useFamilyTree, useLoadMemberRelationships } from "@/hooks/api";
+import {
+  useFamilyTree,
+  useLoadMemberRelationships,
+  useFamilies,
+} from "@/hooks/api";
 
 export default function InteractiveFamilyTree({
   currentMember,
@@ -38,13 +43,19 @@ export default function InteractiveFamilyTree({
   const [zoomLevel, setZoomLevel] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>("hierarchical");
 
+  // Get user's families to determine the correct family ID
+  const { data: userFamilies } = useFamilies();
+
+  // Determine the family ID to use - prefer currentMember.familyId, then first available family
+  const familyId = currentMember.familyId || userFamilies?.[0]?.id;
+
   // Use the new tree endpoint for better data fetching
   const {
     data: treeData,
     isLoading: treeLoading,
     error: treeError,
     refetch: refetchTree,
-  } = useFamilyTree(currentMember.familyId || "default", currentMember.id, 2);
+  } = useFamilyTree(familyId, currentMember.id, 2);
 
   // Lazy loading hook for deeper relationships
   const loadMemberRelationships = useLoadMemberRelationships();
@@ -86,7 +97,16 @@ export default function InteractiveFamilyTree({
     handleZoomOut,
     handleReset,
     handleFitToScreen,
-  } = useTreeZoom();
+    autoFitToScreen,
+  } = useTreeZoom(containerRef);
+
+  // Auto-fit to screen when tree data changes (for visual views only)
+  useEffect(() => {
+    if (treeData?.nodes?.length && viewMode !== "explorer" && !treeLoading) {
+      console.log("🔍 Auto-fitting tree to screen for optimal viewing...");
+      autoFitToScreen();
+    }
+  }, [treeData, viewMode, treeLoading, autoFitToScreen]);
 
   const downloadSVG = () => {
     if (!svgRef.current) return;
@@ -149,8 +169,43 @@ export default function InteractiveFamilyTree({
     svg.selectAll("*").remove();
 
     // Use tree data from API instead of building from member profile
-    const nodes = treeData.nodes || [];
-    const links = treeData.links || [];
+    const rawNodes = treeData.nodes || [];
+    const rawConnections = treeData.connections || [];
+
+    // Map backend nodes to frontend TreeNode format
+    const nodes: TreeNode[] = rawNodes.map((node: any) => ({
+      id: node.id,
+      name: node.name,
+      gender: node.gender,
+      generation: node.level || 0, // Map backend 'level' to frontend 'generation'
+      x: node.x || 0,
+      y: node.y || 0,
+      fx: null,
+      fy: null,
+    }));
+
+    // Transform connections to D3-compatible links
+    const rawLinks = rawConnections
+      .map((connection: any) => {
+        const sourceNode = nodes.find((n: any) => n.id === connection.from);
+        const targetNode = nodes.find((n: any) => n.id === connection.to);
+
+        if (!sourceNode || !targetNode) {
+          console.warn("⚠️ Missing node for connection:", connection);
+          return null;
+        }
+
+        return {
+          source: sourceNode,
+          target: targetNode,
+          type: connection.type,
+        };
+      })
+      .filter((link): link is NonNullable<typeof link> => link !== null); // Remove null entries
+
+    const links: TreeLink[] = rawLinks as TreeLink[];
+
+    console.log("🔗 Transformed links for D3:", links.length);
 
     if (nodes.length === 0) return;
 
@@ -175,8 +230,23 @@ export default function InteractiveFamilyTree({
     let simulation: d3.Simulation<TreeNode, TreeLink> | null = null;
 
     if (viewMode === "hierarchical") {
-      createHierarchicalLayout(nodes, links, width, height);
+      const layoutResult = createHierarchicalLayout(
+        nodes,
+        links,
+        width,
+        height
+      );
+      console.log("📐 Hierarchical layout result:", layoutResult);
     } else if (viewMode === "force") {
+      // Initialize nodes with backend positions if available
+      nodes.forEach((node) => {
+        if (node.x === undefined || node.y === undefined) {
+          // Fallback to random positioning if no backend coordinates
+          node.x = Math.random() * width;
+          node.y = Math.random() * height;
+        }
+      });
+
       simulation = d3
         .forceSimulation<TreeNode>(nodes)
         .force(
@@ -188,21 +258,45 @@ export default function InteractiveFamilyTree({
               const sameGeneration =
                 (d.source as TreeNode).generation ===
                 (d.target as TreeNode).generation;
-              return d.type === "spouse" ? 80 : sameGeneration ? 120 : 150;
+              return d.type === "spouse"
+                ? TREE_SPACING.frontend.linkDistances.spouse
+                : sameGeneration
+                ? TREE_SPACING.frontend.linkDistances.sameGeneration
+                : TREE_SPACING.frontend.linkDistances.differentGeneration;
             })
             .strength((d) => (d.type === "spouse" ? 0.8 : 0.6))
         )
-        .force("charge", d3.forceManyBody().strength(-400))
+        .force(
+          "charge",
+          d3
+            .forceManyBody()
+            .strength(TREE_SPACING.frontend.forceLayout.chargeStrength)
+        )
         .force("center", d3.forceCenter(width / 2, height / 2))
-        .force("collision", d3.forceCollide().radius(50))
+        .force(
+          "collision",
+          d3.forceCollide().radius(TREE_SPACING.frontend.collisionRadius)
+        )
         .force(
           "y",
           d3
             .forceY((d: TreeNode) => {
               const generation = d.generation || 0;
-              return height / 2 + generation * 120;
+              return (
+                height / 2 +
+                generation * TREE_SPACING.frontend.forceLayout.verticalSpacing
+              );
             })
-            .strength(0.3)
+            .strength(TREE_SPACING.frontend.forceLayout.verticalStrength)
+        )
+        .force(
+          "x",
+          d3
+            .forceX((d: TreeNode) => {
+              // Use backend x position as starting point
+              return d.x || width / 2;
+            })
+            .strength(0.1)
         );
     }
 
@@ -410,22 +504,76 @@ export default function InteractiveFamilyTree({
     if (simulation) {
       simulation.on("tick", () => {
         link
-          .attr("x1", (d: any) => d.source.x)
-          .attr("y1", (d: any) => d.source.y)
-          .attr("x2", (d: any) => d.target.x)
-          .attr("y2", (d: any) => d.target.y);
+          .attr("x1", (d: any) => {
+            const source =
+              typeof d.source === "string"
+                ? nodes.find((n) => n.id === d.source)
+                : d.source;
+            return source?.x || 0;
+          })
+          .attr("y1", (d: any) => {
+            const source =
+              typeof d.source === "string"
+                ? nodes.find((n) => n.id === d.source)
+                : d.source;
+            return source?.y || 0;
+          })
+          .attr("x2", (d: any) => {
+            const target =
+              typeof d.target === "string"
+                ? nodes.find((n) => n.id === d.target)
+                : d.target;
+            return target?.x || 0;
+          })
+          .attr("y2", (d: any) => {
+            const target =
+              typeof d.target === "string"
+                ? nodes.find((n) => n.id === d.target)
+                : d.target;
+            return target?.y || 0;
+          });
 
-        nodeGroup.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+        nodeGroup.attr(
+          "transform",
+          (d: any) => `translate(${d.x || 0},${d.y || 0})`
+        );
       });
     } else {
       // For hierarchical layout, set positions immediately
       link
-        .attr("x1", (d: any) => d.source.x)
-        .attr("y1", (d: any) => d.source.y)
-        .attr("x2", (d: any) => d.target.x)
-        .attr("y2", (d: any) => d.target.y);
+        .attr("x1", (d: any) => {
+          const source =
+            typeof d.source === "string"
+              ? nodes.find((n) => n.id === d.source)
+              : d.source;
+          return source?.x || 0;
+        })
+        .attr("y1", (d: any) => {
+          const source =
+            typeof d.source === "string"
+              ? nodes.find((n) => n.id === d.source)
+              : d.source;
+          return source?.y || 0;
+        })
+        .attr("x2", (d: any) => {
+          const target =
+            typeof d.target === "string"
+              ? nodes.find((n) => n.id === d.target)
+              : d.target;
+          return target?.x || 0;
+        })
+        .attr("y2", (d: any) => {
+          const target =
+            typeof d.target === "string"
+              ? nodes.find((n) => n.id === d.target)
+              : d.target;
+          return target?.y || 0;
+        });
 
-      nodeGroup.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+      nodeGroup.attr(
+        "transform",
+        (d: any) => `translate(${d.x || 0},${d.y || 0})`
+      );
     }
 
     // Cleanup function
@@ -515,6 +663,12 @@ export default function InteractiveFamilyTree({
                     <p className="text-sm text-gray-500 mt-1">
                       {treeError.message || "Please try again later"}
                     </p>
+                    {treeError.message?.includes("Access denied") && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        You may not have access to this family. Try logging in
+                        again or contact the family administrator.
+                      </p>
+                    )}
                     <Button
                       onClick={() => refetchTree()}
                       variant="outline"
@@ -524,13 +678,26 @@ export default function InteractiveFamilyTree({
                       Retry
                     </Button>
                   </div>
+                ) : !familyId ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Users className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                    <p>No family access available</p>
+                    <p className="text-sm">
+                      You need to be a member of a family to view the family
+                      tree. Try logging in again or contact your family
+                      administrator.
+                    </p>
+                  </div>
                 ) : nodes.length > 0 ? (
                   <div className="max-h-96 overflow-y-auto border rounded-lg bg-gray-50">
                     {/* Use the new API data tree builder */}
                     {(() => {
-                      const familyTreeRoot = treeData
-                        ? buildFamilyTreeFromApiData(treeData)
-                        : null;
+                      const familyTreeRoot =
+                        treeData &&
+                        treeData.nodes &&
+                        Array.isArray(treeData.nodes)
+                          ? buildFamilyTreeFromApiData(treeData)
+                          : null;
                       return familyTreeRoot ? (
                         <FamilyTreeItem
                           node={familyTreeRoot}
