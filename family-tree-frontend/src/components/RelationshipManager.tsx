@@ -1,24 +1,35 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useAddRelationship, useRemoveRelationship, useFamilyMembers } from '@/hooks/api';
-import { addRelationshipSchema, AddRelationshipFormData } from '@/schemas/member';
-import { RelationshipType, Member, MemberWithRelationships } from '@/types';
-import { ClipLoader } from 'react-spinners';
-import { Check, ChevronsUpDown, Plus, Trash2, Users } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { cn } from '@/lib/utils';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+// import FamilyMemberSelector from "@/components/FamilyMemberSelector";
+
+import {
+  useAddRelationship,
+  useRemoveRelationship,
+  useFamilyMembers,
+} from "@/hooks/api";
+import {
+  addRelationshipSchema,
+  AddRelationshipFormData,
+} from "@/schemas/member";
+import { RelationshipType, Member, MemberWithRelationships } from "@/types";
+import { ClipLoader } from "react-spinners";
+import { Plus, Trash2, Users } from "lucide-react";
+import toast from "react-hot-toast";
+import ReactSelect from "react-select";
 
 interface RelationshipManagerProps {
   currentMember: MemberWithRelationships;
@@ -29,18 +40,16 @@ interface RelationshipManagerProps {
 export default function RelationshipManager({
   currentMember,
   familyId,
-  onRelationshipChange
+  onRelationshipChange,
 }: RelationshipManagerProps) {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [comboboxOpen, setComboboxOpen] = useState(false);
-  const [searchValue, setSearchValue] = useState('');
 
   const addRelationshipMutation = useAddRelationship();
   const removeRelationshipMutation = useRemoveRelationship();
 
   // Get family members for selection
   const { data: familyMembers = [] } = useFamilyMembers(
-    familyId || currentMember.familyMemberships[0]?.familyId || ''
+    familyId || currentMember.familyMemberships[0]?.familyId || ""
   );
 
   const {
@@ -54,26 +63,25 @@ export default function RelationshipManager({
     resolver: zodResolver(addRelationshipSchema),
   });
 
-  const relationshipType = watch('relationshipType');
+  const relationshipType = watch("relationshipType");
 
   // Filter out current member and already related members
   const getAvailableMembers = () => {
     const existingRelationshipIds = new Set([
       currentMember.id,
-      ...currentMember.parents.map(p => p.id),
-      ...currentMember.children.map(c => c.id),
-      ...currentMember.spouses.map(s => s.id),
+      ...currentMember.parents.map((p) => p.id),
+      ...currentMember.children.map((c) => c.id),
+      ...currentMember.spouses.map((s) => s.id),
     ]);
 
-    return familyMembers.filter(member =>
-      !existingRelationshipIds.has(member.id) &&
-      member.name.toLowerCase().includes(searchValue.toLowerCase())
+    return familyMembers.filter(
+      (member) => !existingRelationshipIds.has(member.id)
     );
   };
 
   const onSubmit = async (data: AddRelationshipFormData) => {
     if (!selectedMember) {
-      toast.error('Please select a family member');
+      toast.error("Please select a family member");
       return;
     }
 
@@ -88,11 +96,14 @@ export default function RelationshipManager({
       setSelectedMember(null);
       onRelationshipChange?.();
     } catch (error) {
-      console.error('Failed to add relationship:', error);
+      console.error("Failed to add relationship:", error);
     }
   };
 
-  const handleRemoveRelationship = async (memberId: string, relationshipType: RelationshipType) => {
+  const handleRemoveRelationship = async (
+    memberId: string,
+    relationshipType: RelationshipType
+  ) => {
     try {
       await removeRelationshipMutation.mutateAsync({
         relatedMemberId: memberId,
@@ -100,38 +111,16 @@ export default function RelationshipManager({
       });
       onRelationshipChange?.();
     } catch (error) {
-      console.error('Failed to remove relationship:', error);
+      console.error("Failed to remove relationship:", error);
     }
-  };
-
-  const getRelationshipTypeLabel = (type: RelationshipType) => {
-    switch (type) {
-      case RelationshipType.PARENT:
-        return 'Parent';
-      case RelationshipType.CHILD:
-        return 'Child';
-      case RelationshipType.SPOUSE:
-        return 'Spouse';
-      default:
-        return type;
-    }
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
   };
 
   return (
     <div className="space-y-6">
       {/* Add New Relationship */}
-      <Card>
+      <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
+          <CardTitle className="flex items-center space-x-2 text-green-800">
             <Plus className="h-5 w-5" />
             <span>Add New Relationship</span>
           </CardTitle>
@@ -141,99 +130,101 @@ export default function RelationshipManager({
             {/* Member Selection */}
             <div className="space-y-2">
               <Label>Select Family Member</Label>
-              <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={comboboxOpen}
-                    className="w-full justify-between"
-                  >
-                    {selectedMember ? (
-                      <div className="flex items-center space-x-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {getInitials(selectedMember.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>{selectedMember.name}</span>
-                      </div>
-                    ) : (
-                      "Select a family member..."
-                    )}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandInput
-                      placeholder="Search family members..."
-                      value={searchValue}
-                      onValueChange={setSearchValue}
-                    />
-                    <CommandEmpty>No family members found.</CommandEmpty>
-                    <CommandList>
-                      <CommandGroup>
-                        {getAvailableMembers().map((member) => (
-                          <CommandItem
-                            key={member.id}
-                            value={member.id}
-                            onSelect={() => {
-                              setSelectedMember(member);
-                              setComboboxOpen(false);
-                            }}
-                          >
-                            <div className="flex items-center space-x-2 w-full">
-                              <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-xs">
-                                  {getInitials(member.name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="flex-1">{member.name}</span>
-                              <Check
-                                className={cn(
-                                  "h-4 w-4",
-                                  selectedMember?.id === member.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <ReactSelect
+                value={
+                  selectedMember
+                    ? {
+                        value: selectedMember.id,
+                        label: selectedMember.name,
+                        member: selectedMember,
+                      }
+                    : null
+                }
+                onChange={(option) => setSelectedMember(option?.member || null)}
+                options={getAvailableMembers().map((member) => ({
+                  value: member.id,
+                  label: member.name,
+                  member: member,
+                }))}
+                placeholder="Search and select a family member..."
+                isClearable
+                className="react-select-container"
+                classNamePrefix="react-select"
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    borderColor: "#d1d5db",
+                    "&:hover": {
+                      borderColor: "#9ca3af",
+                    },
+                    backgroundColor: "white",
+                    minHeight: "40px",
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    backgroundColor: state.isSelected
+                      ? "#3b82f6"
+                      : state.isFocused
+                      ? "#eff6ff"
+                      : "white",
+                    color: state.isSelected ? "white" : "#374151",
+                    cursor: "pointer",
+                    "&:hover": {
+                      backgroundColor: state.isSelected ? "#3b82f6" : "#eff6ff",
+                    },
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    border: "1px solid #d1d5db",
+                    borderRadius: "6px",
+                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                  }),
+                  placeholder: (base) => ({
+                    ...base,
+                    color: "#9ca3af",
+                  }),
+                }}
+              />
             </div>
 
             {/* Relationship Type */}
             <div className="space-y-2">
               <Label htmlFor="relationshipType">Relationship Type</Label>
-              <Select onValueChange={(value) => setValue('relationshipType', value as RelationshipType)}>
-                <SelectTrigger>
+              <Select
+                onValueChange={(value) =>
+                  setValue("relationshipType", value as RelationshipType)
+                }
+              >
+                <SelectTrigger className="bg-white">
                   <SelectValue placeholder="Select relationship type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={RelationshipType.PARENT}>
-                    {selectedMember?.name || 'This person'} is my Parent
+                    {selectedMember?.name || "This person"} is my Parent
                   </SelectItem>
                   <SelectItem value={RelationshipType.CHILD}>
-                    {selectedMember?.name || 'This person'} is my Child
+                    {selectedMember?.name || "This person"} is my Child
                   </SelectItem>
                   <SelectItem value={RelationshipType.SPOUSE}>
-                    {selectedMember?.name || 'This person'} is my Spouse
+                    {selectedMember?.name || "This person"} is my Spouse
                   </SelectItem>
                 </SelectContent>
               </Select>
               {errors.relationshipType && (
-                <p className="text-red-500 text-sm">{errors.relationshipType.message}</p>
+                <p className="text-red-500 text-sm">
+                  {errors.relationshipType.message}
+                </p>
               )}
             </div>
 
             <Button
               type="submit"
-              disabled={!selectedMember || !relationshipType || addRelationshipMutation.isPending}
-              className="w-full"
+              disabled={
+                !selectedMember ||
+                !relationshipType ||
+                addRelationshipMutation.isPending
+              }
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
             >
               {addRelationshipMutation.isPending ? (
                 <div className="flex items-center space-x-2">
@@ -241,7 +232,7 @@ export default function RelationshipManager({
                   <span>Adding...</span>
                 </div>
               ) : (
-                'Add Relationship'
+                "Add Relationship"
               )}
             </Button>
           </form>
@@ -249,7 +240,7 @@ export default function RelationshipManager({
       </Card>
 
       {/* Current Relationships */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Users className="h-5 w-5" />
@@ -258,7 +249,6 @@ export default function RelationshipManager({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* Parents */}
             {currentMember.parents && currentMember.parents.length > 0 && (
               <div>
                 <h4 className="font-medium text-sm mb-2 text-gray-700">Parents</h4>
@@ -290,7 +280,6 @@ export default function RelationshipManager({
               </div>
             )}
 
-            {/* Spouses */}
             {currentMember.spouses && currentMember.spouses.length > 0 && (
               <div>
                 <h4 className="font-medium text-sm mb-2 text-gray-700">Spouses</h4>
@@ -322,7 +311,6 @@ export default function RelationshipManager({
               </div>
             )}
 
-            {/* Children */}
             {currentMember.children && currentMember.children.length > 0 && (
               <div>
                 <h4 className="font-medium text-sm mb-2 text-gray-700">Children</h4>
@@ -354,7 +342,6 @@ export default function RelationshipManager({
               </div>
             )}
 
-            {/* No relationships */}
             {(!currentMember.parents || currentMember.parents.length === 0) &&
              (!currentMember.spouses || currentMember.spouses.length === 0) &&
              (!currentMember.children || currentMember.children.length === 0) && (
@@ -366,7 +353,7 @@ export default function RelationshipManager({
             )}
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 }

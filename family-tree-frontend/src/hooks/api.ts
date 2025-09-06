@@ -25,7 +25,7 @@ import {
   FolderTreeExportData,
 } from "@/types";
 import { useAppDispatch, useAppSelector } from "./redux";
-import { loginSuccess, logout } from "@/store/slices/authSlice";
+import { loginSuccess, logout, setProfile } from "@/store/slices/authSlice";
 import toast from "react-hot-toast";
 
 // Auth hooks
@@ -41,7 +41,8 @@ export const useLogin = () => {
       );
       return response;
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
+      // Store basic user data
       dispatch(
         loginSuccess({
           user: data?.user,
@@ -49,7 +50,18 @@ export const useLogin = () => {
           refreshToken: data?.refreshToken,
         })
       );
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
+
+      // Fetch and store full profile data
+      try {
+        const profileResponse = await apiClient.get<MemberWithRelationships>(
+          "/members/profile"
+        );
+        dispatch(setProfile(profileResponse));
+      } catch (error) {
+        console.error("Failed to fetch profile after login:", error);
+        // Don't fail the login if profile fetch fails
+      }
+
       toast.success("Login successful!");
     },
     onError: (error: Error) => {
@@ -60,7 +72,6 @@ export const useLogin = () => {
 
 export const useRegister = () => {
   const dispatch = useAppDispatch();
-  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: RegisterRequest) => {
@@ -70,7 +81,8 @@ export const useRegister = () => {
       );
       return response;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      // Store basic user data
       dispatch(
         loginSuccess({
           user: data.data.user,
@@ -78,7 +90,18 @@ export const useRegister = () => {
           refreshToken: data.data.refreshToken,
         })
       );
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
+
+      // Fetch and store full profile data
+      try {
+        const profileResponse = await apiClient.get<MemberWithRelationships>(
+          "/members/profile"
+        );
+        dispatch(setProfile(profileResponse));
+      } catch (error) {
+        console.error("Failed to fetch profile after registration:", error);
+        // Don't fail the registration if profile fetch fails
+      }
+
       toast.success("Registration successful!");
     },
     onError: (error: Error) => {
@@ -95,6 +118,14 @@ export const useLogout = () => {
     dispatch(logout());
     queryClient.clear();
     toast.success("Logged out successfully");
+
+    // Use Next.js router for client-side navigation
+    if (typeof window !== "undefined") {
+      // Small delay to allow state updates to complete
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 100);
+    }
   };
 };
 
@@ -185,15 +216,59 @@ export const useProfile = () => {
   });
 };
 
+// Redux-based profile hook (preferred)
+export const useProfileFromStore = () => {
+  const { profile, isAuthenticated } = useAppSelector((state) => state.auth);
+  return { profile, isAuthenticated };
+};
+
+// Hook for automatic redirection when profile is missing
+export const useAuthGuard = () => {
+  const { profile, isAuthenticated, loading } = useAppSelector(
+    (state) => state.auth
+  );
+
+  // Only redirect if we're not in a loading state and definitely not authenticated
+  // This prevents redirecting during page refresh when auth is being initialized
+  if (typeof window !== "undefined" && !loading) {
+    if (!isAuthenticated || !profile) {
+      // Check if we're on a protected route (not auth routes)
+      const currentPath = window.location.pathname;
+      const isOnProtectedRoute =
+        !currentPath.startsWith("/login") &&
+        !currentPath.startsWith("/signup") &&
+        currentPath !== "/";
+
+      // Only redirect if we're on a protected route and definitely not authenticated
+      if (isOnProtectedRoute && !isAuthenticated) {
+        // Small delay to prevent immediate redirect during state transitions
+        setTimeout(() => {
+          if (window.location.pathname !== "/") {
+            window.location.href = "/";
+          }
+        }, 100);
+      }
+    }
+  }
+
+  return { profile, isAuthenticated, hasProfile: !!profile };
+};
+
 export const useUpdateProfile = () => {
+  const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: UpdateMemberRequest) => {
-      const response = await apiClient.put<Member>("/members/profile", data);
+      const response = await apiClient.put<MemberWithRelationships>(
+        "/members/profile",
+        data
+      );
       return response;
     },
-    onSuccess: () => {
+    onSuccess: (updatedProfile) => {
+      // Update Redux store with the new profile data
+      dispatch(setProfile(updatedProfile));
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast.success("Profile updated successfully!");
     },
@@ -650,16 +725,19 @@ export const useUnreadNotificationCount = () => {
       return response;
     },
     enabled: isAuthenticated,
-    refetchInterval: 60000, // Refetch every 60 seconds to avoid rate limiting
+    refetchInterval: 120000, // Refetch every 2 minutes to avoid rate limiting
+    refetchIntervalInBackground: false, // Don't refetch when tab is not active
+    staleTime: 30000, // Consider data fresh for 30 seconds
     retry: (failureCount, error: any) => {
       // Don't retry on 429 errors to avoid making it worse
       if (error?.status === 429) {
+        console.warn("Rate limited - skipping retry for unread count");
         return false;
       }
-      // Retry up to 3 times for other errors
-      return failureCount < 3;
+      // Retry up to 2 times for other errors with longer delay
+      return failureCount < 2;
     },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    retryDelay: (attemptIndex) => Math.min(2000 * 2 ** attemptIndex, 60000), // Exponential backoff
   });
 };
 
@@ -739,44 +817,85 @@ export const useDeleteNotification = () => {
 export const useExportFamilyData = () => {
   return useMutation({
     mutationFn: async (exportRequest: ExportRequest) => {
-      // For blob responses, we need to handle the fetch manually
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(
-        `${
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"
-        }/export/family-data`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token && { Authorization: `Bearer ${token}` }),
-          },
-          body: JSON.stringify(exportRequest),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Export failed: ${response.statusText}`);
-      }
-
-      return response.blob();
+      const response = await apiClient.post<{
+        downloadUrl: string;
+        filename: string;
+      }>("/export/family-data", exportRequest);
+      return response;
     },
-    onSuccess: (blob, variables) => {
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `family-tree-${variables.format}-${
-        new Date().toISOString().split("T")[0]
-      }.${variables.format === "pdf" ? "pdf" : "xlsx"}`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+    onSuccess: async (result, variables) => {
+      if (result && result.downloadUrl) {
+        // Ensure full URL for download
+        const fullUrl = result.downloadUrl.startsWith("http")
+          ? result.downloadUrl
+          : `${window.location.origin}${result.downloadUrl}`;
 
-      toast.success(
-        `Family data exported successfully as ${variables.format.toUpperCase()}!`
-      );
+        console.log("Download URL:", fullUrl);
+
+        // Get JWT token from localStorage
+        const token = localStorage.getItem("accessToken");
+
+        try {
+          // Try direct link approach first with token in URL
+          // const urlWithToken = token
+          //   ? `${fullUrl}${
+          //       fullUrl.includes("?") ? "&" : "?"
+          //     }token=${encodeURIComponent(token)}`
+          //   : fullUrl;
+
+          const link = document.createElement("a");
+          link.href = fullUrl; // urlWithToken;
+          link.download = result.filename || `family-tree.${variables.format}`;
+          link.style.display = "none";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          toast.success(
+            `${variables.format.toUpperCase()} exported successfully!`
+          );
+        } catch (error) {
+          console.error(
+            "Direct download failed, trying fetch approach:",
+            error
+          );
+
+          // Fallback: Use fetch with Authorization header
+          try {
+            const response = await fetch(fullUrl, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+
+            if (!response.ok) {
+              throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+              );
+            }
+
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.download =
+              result.filename || `family-tree.${variables.format}`;
+            link.style.display = "none";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Clean up blob URL
+            setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
+
+            toast.success(
+              `${variables.format.toUpperCase()} exported successfully!`
+            );
+          } catch (fallbackError) {
+            console.error("Fallback download also failed:", fallbackError);
+            toast.error("Download failed. Please try again.");
+          }
+        }
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to export family data");
@@ -850,18 +969,24 @@ export const useMemberRelationships = (memberId: string, depth: number = 2) => {
   return useQuery({
     queryKey: ["member-relationships", memberId, depth],
     queryFn: async () => {
-      const response = await apiClient.get<{
-        member: any;
-        parents: any[];
-        spouses: any[];
-        children: any[];
+      const response = await apiClient.get<MemberWithRelationships>(
+        `/members/${memberId}`
+      );
+      // Transform the response to match the expected format
+      return {
+        member: response,
+        parents: response.parents || [],
+        spouses: response.spouses || [],
+        children: response.children || [],
         metadata: {
-          hasMoreParents: boolean;
-          hasMoreChildren: boolean;
-          totalRelationships: number;
-        };
-      }>(`/members/${memberId}/relationships?depth=${depth}`);
-      return response;
+          hasMoreParents: false,
+          hasMoreChildren: false,
+          totalRelationships:
+            (response.parents?.length || 0) +
+            (response.spouses?.length || 0) +
+            (response.children?.length || 0),
+        },
+      };
     },
     enabled: isAuthenticated && !!memberId,
     staleTime: 1000 * 60 * 10, // 10 minutes - relationships don't change often

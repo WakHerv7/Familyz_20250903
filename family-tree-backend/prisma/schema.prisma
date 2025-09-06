@@ -135,6 +135,9 @@ model FamilyMembership {
   // Join date
   joinDate DateTime @default(now()) @map("join_date")
 
+  // Granular permissions
+  familyMemberPermissions FamilyMemberPermission[]
+
   @@unique([memberId, familyId])
   @@map("family_memberships")
 }
@@ -395,4 +398,25 @@ model Notification {
   metadata Json? // Additional data like post title, comment preview, etc.
 
   @@map("notifications")
+}
+
+// Enhanced Permissions System
+
+// Granular permissions for family members beyond basic roles
+model FamilyMemberPermission {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Family membership relationship
+  familyMemberId String @map("family_member_id")
+  familyMember   FamilyMembership @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+
+  // Permission details
+  permission String // Permission enum value
+  grantedBy  String @map("granted_by") // Member ID who granted the permission
+  grantedAt  DateTime @default(now()) @map("granted_at")
+
+  @@unique([familyMemberId, permission])
+  @@map("family_member_permissions")
 }

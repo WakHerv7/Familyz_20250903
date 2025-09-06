@@ -18,6 +18,9 @@ const swagger_1 = require("@nestjs/swagger");
 const member_service_1 = require("./member.service");
 const member_dto_1 = require("./dto/member.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const permissions_guard_1 = require("../auth/permissions.guard");
+const permissions_decorator_1 = require("../auth/permissions.decorator");
+const permissions_enum_1 = require("../auth/permissions.enum");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let MemberController = class MemberController {
     constructor(memberService) {
@@ -50,19 +53,19 @@ let MemberController = class MemberController {
 };
 exports.MemberController = MemberController;
 __decorate([
-    (0, common_1.Get)('profile'),
+    (0, common_1.Get)("profile"),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get my profile',
-        description: 'Get current user\'s member profile with all relationships',
+        summary: "Get my profile",
+        description: "Get current user's member profile with all relationships",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Profile retrieved successfully',
+        description: "Profile retrieved successfully",
         type: member_dto_1.MemberRelationshipsResponseDto,
     }),
     (0, swagger_1.ApiResponse)({
         status: 404,
-        description: 'Member profile not found',
+        description: "Member profile not found",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -70,19 +73,20 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], MemberController.prototype, "getMyProfile", null);
 __decorate([
-    (0, common_1.Put)('profile'),
+    (0, common_1.Put)("profile"),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.EDIT_OWN_PROFILE),
     (0, swagger_1.ApiOperation)({
-        summary: 'Update my profile',
-        description: 'Update current user\'s member profile information',
+        summary: "Update my profile",
+        description: "Update current user's member profile information",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Profile updated successfully',
+        description: "Profile updated successfully",
         type: member_dto_1.MemberResponseDto,
     }),
     (0, swagger_1.ApiResponse)({
         status: 404,
-        description: 'Member profile not found',
+        description: "Member profile not found",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
@@ -91,47 +95,48 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], MemberController.prototype, "updateMyProfile", null);
 __decorate([
-    (0, common_1.Get)(':id'),
+    (0, common_1.Get)(":id"),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get member details',
-        description: 'Get details of a specific member (must be in same family)',
+        summary: "Get member details",
+        description: "Get details of a specific member (must be in same family)",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Member details retrieved successfully',
+        description: "Member details retrieved successfully",
         type: member_dto_1.MemberRelationshipsResponseDto,
     }),
     (0, swagger_1.ApiResponse)({
         status: 404,
-        description: 'Member not found',
+        description: "Member not found",
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied - member not in your families',
+        description: "Access denied - member not in your families",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)("id")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], MemberController.prototype, "getMemberDetails", null);
 __decorate([
-    (0, common_1.Post)('relationships'),
+    (0, common_1.Post)("relationships"),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.EDIT_MEMBERS),
     (0, swagger_1.ApiOperation)({
-        summary: 'Add relationship',
-        description: 'Add a parent, spouse, or child relationship with another member',
+        summary: "Add relationship",
+        description: "Add a parent, spouse, or child relationship with another member",
     }),
     (0, swagger_1.ApiResponse)({
         status: 201,
-        description: 'Relationship added successfully',
+        description: "Relationship added successfully",
     }),
     (0, swagger_1.ApiResponse)({
         status: 400,
-        description: 'Invalid relationship or member already related',
+        description: "Invalid relationship or member already related",
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied - cannot relate to member outside your families',
+        description: "Access denied - cannot relate to member outside your families",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
@@ -140,23 +145,24 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], MemberController.prototype, "addRelationship", null);
 __decorate([
-    (0, common_1.Delete)('relationships'),
+    (0, common_1.Delete)("relationships"),
     (0, common_1.HttpCode)(200),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.EDIT_MEMBERS),
     (0, swagger_1.ApiOperation)({
-        summary: 'Remove relationship',
-        description: 'Remove a parent, spouse, or child relationship with another member',
+        summary: "Remove relationship",
+        description: "Remove a parent, spouse, or child relationship with another member",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Relationship removed successfully',
+        description: "Relationship removed successfully",
     }),
     (0, swagger_1.ApiResponse)({
         status: 404,
-        description: 'Relationship not found',
+        description: "Relationship not found",
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied',
+        description: "Access denied",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
@@ -165,18 +171,19 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], MemberController.prototype, "removeRelationship", null);
 __decorate([
-    (0, common_1.Post)('relationships/bulk'),
+    (0, common_1.Post)("relationships/bulk"),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.EDIT_MEMBERS),
     (0, swagger_1.ApiOperation)({
-        summary: 'Add multiple relationships',
-        description: 'Add multiple relationships in a single operation',
+        summary: "Add multiple relationships",
+        description: "Add multiple relationships in a single operation",
     }),
     (0, swagger_1.ApiResponse)({
         status: 201,
-        description: 'Bulk relationships processed',
+        description: "Bulk relationships processed",
     }),
     (0, swagger_1.ApiResponse)({
         status: 400,
-        description: 'Some relationships failed to be created',
+        description: "Some relationships failed to be created",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
@@ -186,22 +193,23 @@ __decorate([
 ], MemberController.prototype, "addBulkRelationships", null);
 __decorate([
     (0, common_1.Post)(),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.ADD_MEMBERS),
     (0, swagger_1.ApiOperation)({
-        summary: 'Create new member',
-        description: 'Create a new member in a family (requires family access)',
+        summary: "Create new member",
+        description: "Create a new member in a family (requires family access)",
     }),
     (0, swagger_1.ApiResponse)({
         status: 201,
-        description: 'Member created successfully',
+        description: "Member created successfully",
         type: member_dto_1.MemberResponseDto,
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied - not a member of this family',
+        description: "Access denied - not a member of this family",
     }),
     (0, swagger_1.ApiResponse)({
         status: 404,
-        description: 'Family not found',
+        description: "Family not found",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
@@ -210,31 +218,32 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], MemberController.prototype, "createMember", null);
 __decorate([
-    (0, common_1.Get)('family/:familyId'),
+    (0, common_1.Get)("family/:familyId"),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.VIEW_MEMBERS),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get family members',
-        description: 'Get all members in a specific family',
+        summary: "Get family members",
+        description: "Get all members in a specific family",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Family members retrieved successfully',
+        description: "Family members retrieved successfully",
         type: [member_dto_1.MemberResponseDto],
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied - not a member of this family',
+        description: "Access denied - not a member of this family",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('familyId')),
+    __param(1, (0, common_1.Param)("familyId")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], MemberController.prototype, "getFamilyMembers", null);
 exports.MemberController = MemberController = __decorate([
-    (0, swagger_1.ApiTags)('Members'),
+    (0, swagger_1.ApiTags)("Members"),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, common_1.Controller)('members'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.Controller)("members"),
     __metadata("design:paramtypes", [member_service_1.MemberService])
 ], MemberController);
 //# sourceMappingURL=member.controller.js.map

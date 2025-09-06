@@ -1,17 +1,23 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useExportFamilyData, useGetFolderTreeData } from '@/hooks/api';
-import { MemberWithRelationships, ExportRequest, ExportConfig } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Download, FileText, Table, Users, Folder, Check } from 'lucide-react';
-import { ClipLoader } from 'react-spinners';
-import toast from 'react-hot-toast';
+import { useState } from "react";
+import { useExportFamilyData, useGetFolderTreeData } from "@/hooks/api";
+import { MemberWithRelationships, ExportRequest, ExportConfig } from "@/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Download, FileText, Table, Users, Folder, Check } from "lucide-react";
+import { ClipLoader } from "react-spinners";
+import toast from "react-hot-toast";
 
 interface ExportManagerProps {
   currentMember: MemberWithRelationships;
@@ -19,8 +25,8 @@ interface ExportManagerProps {
 }
 
 interface ExportOptions {
-  format: 'pdf' | 'excel';
-  scope: 'current-family' | 'all-families' | 'selected-families';
+  format: "pdf" | "excel";
+  scope: "current-family" | "all-families" | "selected-families";
   familyIds?: string[];
   config: ExportConfig;
   includeData: {
@@ -31,16 +37,19 @@ interface ExportOptions {
   };
 }
 
-export default function ExportManager({ currentMember, isAdmin = false }: ExportManagerProps) {
+export default function ExportManager({
+  currentMember,
+  isAdmin = false,
+}: ExportManagerProps) {
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
-    format: 'pdf',
-    scope: 'current-family',
+    format: "pdf",
+    scope: "current-family",
     config: {
-      formats: ['pdf', 'excel'],
+      formats: ["pdf", "excel"],
       familyTree: {
-        structure: 'folderTree',
+        structure: "folderTree",
         includeMembersList: true,
-        memberDetails: ['parent', 'children', 'spouses'],
+        memberDetails: ["parent", "children", "spouses"],
       },
     },
     includeData: {
@@ -51,20 +60,21 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
     },
   });
 
-  const { data: folderTreeData, isLoading: loadingTreeData } = useGetFolderTreeData();
+  const { data: folderTreeData, isLoading: loadingTreeData } =
+    useGetFolderTreeData();
   const exportFamilyData = useExportFamilyData();
 
   const handleExportOptionChange = (key: keyof ExportOptions, value: any) => {
-    setExportOptions(prev => ({
+    setExportOptions((prev) => ({
       ...prev,
       [key]: value,
     }));
   };
 
   const handleConfigChange = (configPath: string, value: any) => {
-    setExportOptions(prev => {
+    setExportOptions((prev) => {
       const newConfig = { ...prev.config };
-      const keys = configPath.split('.');
+      const keys = configPath.split(".");
       let current = newConfig as any;
 
       for (let i = 0; i < keys.length - 1; i++) {
@@ -76,8 +86,11 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
     });
   };
 
-  const handleIncludeDataChange = (key: keyof ExportOptions['includeData'], value: boolean) => {
-    setExportOptions(prev => ({
+  const handleIncludeDataChange = (
+    key: keyof ExportOptions["includeData"],
+    value: boolean
+  ) => {
+    setExportOptions((prev) => ({
       ...prev,
       includeData: {
         ...prev.includeData,
@@ -90,28 +103,31 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
     const currentDetails = exportOptions.config.familyTree.memberDetails;
     const newDetails = checked
       ? [...currentDetails, detail]
-      : currentDetails.filter(d => d !== detail);
+      : currentDetails.filter((d) => d !== detail);
 
-    handleConfigChange('familyTree.memberDetails', newDetails);
+    handleConfigChange("familyTree.memberDetails", newDetails);
   };
 
   const handleFamilySelection = (familyId: string, checked: boolean) => {
     const currentIds = exportOptions.familyIds || [];
     const newIds = checked
       ? [...currentIds, familyId]
-      : currentIds.filter(id => id !== familyId);
+      : currentIds.filter((id) => id !== familyId);
 
-    handleExportOptionChange('familyIds', newIds);
+    handleExportOptionChange("familyIds", newIds);
   };
 
   const handleExport = async () => {
     if (!folderTreeData) {
-      toast.error('No data available for export');
+      toast.error("No data available for export");
       return;
     }
 
-    if (exportOptions.scope === 'selected-families' && (!exportOptions.familyIds || exportOptions.familyIds.length === 0)) {
-      toast.error('Please select at least one family');
+    if (
+      exportOptions.scope === "selected-families" &&
+      (!exportOptions.familyIds || exportOptions.familyIds.length === 0)
+    ) {
+      toast.error("Please select at least one family");
       return;
     }
 
@@ -126,7 +142,8 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
 
       await exportFamilyData.mutateAsync(exportRequest);
     } catch (error) {
-      console.error('Export failed:', error);
+      console.error("Export failed:", error);
+      toast.error("Export failed. Please try again.");
     }
   };
 
@@ -136,17 +153,25 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
     let totalFamilies = folderTreeData.families.length;
     let totalMembers = folderTreeData.membersList.length;
 
-    if (exportOptions.scope === 'current-family') {
+    if (exportOptions.scope === "current-family") {
       const currentFamilyId = currentMember.familyMemberships?.[0]?.familyId;
-      const currentFamily = folderTreeData.families.find(f => f.id === currentFamilyId);
+      const currentFamily = folderTreeData.families.find(
+        (f) => f.id === currentFamilyId
+      );
       totalFamilies = 1;
       totalMembers = currentFamily?.members.length || 0;
-    } else if (exportOptions.scope === 'selected-families' && exportOptions.familyIds) {
-      const selectedFamilies = folderTreeData.families.filter(f =>
+    } else if (
+      exportOptions.scope === "selected-families" &&
+      exportOptions.familyIds
+    ) {
+      const selectedFamilies = folderTreeData.families.filter((f) =>
         exportOptions.familyIds!.includes(f.id)
       );
       totalFamilies = selectedFamilies.length;
-      totalMembers = selectedFamilies.reduce((sum, family) => sum + family.members.length, 0);
+      totalMembers = selectedFamilies.reduce(
+        (sum, family) => sum + family.members.length,
+        0
+      );
     }
 
     return { totalFamilies, totalMembers };
@@ -176,8 +201,8 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
               <Label className="text-base font-medium">Export Format</Label>
               <Select
                 value={exportOptions.format}
-                onValueChange={(value: 'pdf' | 'excel') =>
-                  handleExportOptionChange('format', value)
+                onValueChange={(value: "pdf" | "excel") =>
+                  handleExportOptionChange("format", value)
                 }
               >
                 <SelectTrigger>
@@ -205,44 +230,70 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
               <Label className="text-base font-medium">Export Scope</Label>
               <Select
                 value={exportOptions.scope}
-                onValueChange={(value: 'current-family' | 'all-families' | 'selected-families') =>
-                  handleExportOptionChange('scope', value)
-                }
+                onValueChange={(
+                  value: "current-family" | "all-families" | "selected-families"
+                ) => handleExportOptionChange("scope", value)}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="current-family">Current Family Only</SelectItem>
-                  {isAdmin && <SelectItem value="all-families">All Families</SelectItem>}
-                  {isAdmin && <SelectItem value="selected-families">Selected Families</SelectItem>}
+                  <SelectItem value="current-family">
+                    Current Family Only
+                  </SelectItem>
+                  {isAdmin && (
+                    <SelectItem value="all-families">All Families</SelectItem>
+                  )}
+                  {isAdmin && (
+                    <SelectItem value="selected-families">
+                      Selected Families
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
             {/* Family Selection */}
-            {exportOptions.scope === 'selected-families' && isAdmin && folderTreeData && (
-              <div className="space-y-2">
-                <Label className="text-base font-medium">Select Families</Label>
-                <div className="max-h-32 overflow-y-auto border rounded p-3 space-y-2">
-                  {folderTreeData.families.map((family) => (
-                    <div key={family.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`family-${family.id}`}
-                        checked={exportOptions.familyIds?.includes(family.id) || false}
-                        onCheckedChange={(checked) => {
-                          handleFamilySelection(family.id, checked as boolean);
-                        }}
-                      />
-                      <Label htmlFor={`family-${family.id}`} className="text-sm flex-1">
-                        {family.name}
-                        <span className="text-gray-500 ml-1">({family.members.length} members)</span>
-                      </Label>
-                    </div>
-                  ))}
+            {exportOptions.scope === "selected-families" &&
+              isAdmin &&
+              folderTreeData && (
+                <div className="space-y-2">
+                  <Label className="text-base font-medium">
+                    Select Families
+                  </Label>
+                  <div className="max-h-32 overflow-y-auto border rounded p-3 space-y-2">
+                    {folderTreeData.families.map((family) => (
+                      <div
+                        key={family.id}
+                        className="flex items-center space-x-2"
+                      >
+                        <Checkbox
+                          id={`family-${family.id}`}
+                          checked={
+                            exportOptions.familyIds?.includes(family.id) ||
+                            false
+                          }
+                          onCheckedChange={(checked) => {
+                            handleFamilySelection(
+                              family.id,
+                              checked as boolean
+                            );
+                          }}
+                        />
+                        <Label
+                          htmlFor={`family-${family.id}`}
+                          className="text-sm flex-1"
+                        >
+                          {family.name}
+                          <span className="text-gray-500 ml-1">
+                            ({family.members.length} members)
+                          </span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Family Tree Structure Configuration */}
             <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
@@ -257,7 +308,9 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
                   <Label className="text-sm">Structure Format</Label>
                   <Select
                     value={exportOptions.config.familyTree.structure}
-                    onValueChange={(value) => handleConfigChange('familyTree.structure', value)}
+                    onValueChange={(value) =>
+                      handleConfigChange("familyTree.structure", value)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -269,12 +322,26 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
                           <span>Folder Tree (Hierarchical)</span>
                         </div>
                       </SelectItem>
-                      <SelectItem value="traditional">Traditional Tree</SelectItem>
-                      <SelectItem value="interactive">Interactive Layout</SelectItem>
+                      <SelectItem value="textTree">
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4" />
+                          <span>Text Tree (Symbolic)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="traditional">
+                        Traditional Tree
+                      </SelectItem>
+                      <SelectItem value="interactive">
+                        Interactive Layout
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-gray-600">
-                    Folder Tree organizes families and generations hierarchically
+                    {exportOptions.config.familyTree.structure === "folderTree"
+                      ? "Folder Tree organizes families and generations hierarchically"
+                      : exportOptions.config.familyTree.structure === "textTree"
+                      ? "Text Tree displays family relationships with symbols and tree structure"
+                      : "Traditional tree layout with visual connections"}
                   </p>
                 </div>
 
@@ -284,7 +351,10 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
                     id="include-members-list"
                     checked={exportOptions.config.familyTree.includeMembersList}
                     onCheckedChange={(checked) =>
-                      handleConfigChange('familyTree.includeMembersList', checked)
+                      handleConfigChange(
+                        "familyTree.includeMembersList",
+                        checked
+                      )
                     }
                   />
                   <Label htmlFor="include-members-list" className="text-sm">
@@ -297,21 +367,32 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
                   <Label className="text-sm">Include Member Details</Label>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { key: 'parent', label: 'Parents' },
-                      { key: 'children', label: 'Children' },
-                      { key: 'spouses', label: 'Spouses' },
-                      { key: 'personalInfo', label: 'Personal Info' },
-                      { key: 'contact', label: 'Contact Info' },
+                      { key: "parent", label: "Parents" },
+                      { key: "children", label: "Children" },
+                      { key: "spouses", label: "Spouses" },
+                      { key: "personalInfo", label: "Personal Info" },
+                      { key: "contact", label: "Contact Info" },
                     ].map((detail) => (
-                      <div key={detail.key} className="flex items-center space-x-2">
+                      <div
+                        key={detail.key}
+                        className="flex items-center space-x-2"
+                      >
                         <Checkbox
                           id={`detail-${detail.key}`}
-                          checked={exportOptions.config.familyTree.memberDetails.includes(detail.key as any)}
+                          checked={exportOptions.config.familyTree.memberDetails.includes(
+                            detail.key as any
+                          )}
                           onCheckedChange={(checked) =>
-                            handleMemberDetailsChange(detail.key, checked as boolean)
+                            handleMemberDetailsChange(
+                              detail.key,
+                              checked as boolean
+                            )
                           }
                         />
-                        <Label htmlFor={`detail-${detail.key}`} className="text-xs">
+                        <Label
+                          htmlFor={`detail-${detail.key}`}
+                          className="text-xs"
+                        >
                           {detail.label}
                         </Label>
                       </div>
@@ -330,7 +411,10 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
                     id="personal-info"
                     checked={exportOptions.includeData.personalInfo}
                     onCheckedChange={(checked) =>
-                      handleIncludeDataChange('personalInfo', checked as boolean)
+                      handleIncludeDataChange(
+                        "personalInfo",
+                        checked as boolean
+                      )
                     }
                   />
                   <Label htmlFor="personal-info" className="text-sm">
@@ -343,7 +427,7 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
                     id="contact-info"
                     checked={exportOptions.includeData.contactInfo}
                     onCheckedChange={(checked) =>
-                      handleIncludeDataChange('contactInfo', checked as boolean)
+                      handleIncludeDataChange("contactInfo", checked as boolean)
                     }
                   />
                   <Label htmlFor="contact-info" className="text-sm">
@@ -356,7 +440,10 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
                     id="relationships"
                     checked={exportOptions.includeData.relationships}
                     onCheckedChange={(checked) =>
-                      handleIncludeDataChange('relationships', checked as boolean)
+                      handleIncludeDataChange(
+                        "relationships",
+                        checked as boolean
+                      )
                     }
                   />
                   <Label htmlFor="relationships" className="text-sm">
@@ -369,7 +456,10 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
                     id="profile-images"
                     checked={exportOptions.includeData.profileImages}
                     onCheckedChange={(checked) =>
-                      handleIncludeDataChange('profileImages', checked as boolean)
+                      handleIncludeDataChange(
+                        "profileImages",
+                        checked as boolean
+                      )
                     }
                   />
                   <Label htmlFor="profile-images" className="text-sm">
@@ -384,17 +474,29 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center space-x-2 mb-2">
                   <Users className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">Export Preview</span>
+                  <span className="text-sm font-medium text-blue-800">
+                    Export Preview
+                  </span>
                 </div>
                 <div className="space-y-1 text-sm text-blue-700">
                   <p>
-                    <strong>{previewData.totalFamilies}</strong> {previewData.totalFamilies === 1 ? 'family' : 'families'} •
-                    <strong> {previewData.totalMembers}</strong> {previewData.totalMembers === 1 ? 'member' : 'members'}
+                    <strong>{previewData.totalFamilies}</strong>{" "}
+                    {previewData.totalFamilies === 1 ? "family" : "families"} •
+                    <strong> {previewData.totalMembers}</strong>{" "}
+                    {previewData.totalMembers === 1 ? "member" : "members"}
                   </p>
-                  <p>Format: <strong>{exportOptions.format.toUpperCase()}</strong></p>
-                  <p>Structure: <strong>{exportOptions.config.familyTree.structure}</strong></p>
                   <p>
-                    Details: {exportOptions.config.familyTree.memberDetails.join(', ') || 'None'}
+                    Format:{" "}
+                    <strong>{exportOptions.format.toUpperCase()}</strong>
+                  </p>
+                  <p>
+                    Structure:{" "}
+                    <strong>{exportOptions.config.familyTree.structure}</strong>
+                  </p>
+                  <p>
+                    Details:{" "}
+                    {exportOptions.config.familyTree.memberDetails.join(", ") ||
+                      "None"}
                   </p>
                 </div>
               </div>
@@ -410,7 +512,9 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
               {exportFamilyData.isPending ? (
                 <div className="flex items-center space-x-2">
                   <ClipLoader size={16} color="white" />
-                  <span>Generating {exportOptions.format.toUpperCase()}...</span>
+                  <span>
+                    Generating {exportOptions.format.toUpperCase()}...
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center space-x-2">
@@ -423,7 +527,9 @@ export default function ExportManager({ currentMember, isAdmin = false }: Export
             {/* Feature Highlights */}
             <div className="text-xs text-gray-600 space-y-1">
               <p className="font-medium">✨ Enhanced Export Features:</p>
-              <p>• Folder Tree structure with hierarchical family organization</p>
+              <p>
+                • Folder Tree structure with hierarchical family organization
+              </p>
               <p>• Complete member lists with configurable details</p>
               <p>• Profile image inclusion (PDF exports)</p>
               <p>• Relationship mapping (parents, children, spouses)</p>

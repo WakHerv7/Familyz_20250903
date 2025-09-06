@@ -24,7 +24,7 @@ let TreeService = class TreeService {
             select: { name: true },
         });
         if (!family) {
-            throw new common_1.NotFoundException('Family not found');
+            throw new common_1.NotFoundException("Family not found");
         }
         const members = await this.getVisibleMembers(user, familyId);
         const centerNodeId = centerMemberId || user.memberId || members[0]?.id;
@@ -46,33 +46,30 @@ let TreeService = class TreeService {
         const members = await this.getVisibleMembers(user, familyId);
         const families = await this.prisma.family.findMany({
             where: {
-                OR: [
-                    { id: familyId },
-                    { parentFamilyId: familyId },
-                ],
+                OR: [{ id: familyId }, { parentFamilyId: familyId }],
             },
         });
         const totalMembers = members.length;
         const totalFamilies = families.length;
         const genderDistribution = {
-            male: members.filter(m => m.gender === 'MALE').length,
-            female: members.filter(m => m.gender === 'FEMALE').length,
-            other: members.filter(m => m.gender === 'OTHER').length,
-            unspecified: members.filter(m => !m.gender || m.gender === 'PREFER_NOT_TO_SAY').length,
+            male: members.filter((m) => m.gender === "MALE").length,
+            female: members.filter((m) => m.gender === "FEMALE").length,
+            other: members.filter((m) => m.gender === "OTHER").length,
+            unspecified: members.filter((m) => !m.gender || m.gender === "PREFER_NOT_TO_SAY").length,
         };
         const statusDistribution = {
-            active: members.filter(m => m.status === 'ACTIVE').length,
-            inactive: members.filter(m => m.status === 'INACTIVE').length,
-            deceased: members.filter(m => m.status === 'DECEASED').length,
-            archived: members.filter(m => m.status === 'ARCHIVED').length,
+            active: members.filter((m) => m.status === "ACTIVE").length,
+            inactive: members.filter((m) => m.status === "INACTIVE").length,
+            deceased: members.filter((m) => m.status === "DECEASED").length,
+            archived: members.filter((m) => m.status === "ARCHIVED").length,
         };
         const totalChildren = members.reduce((sum, member) => sum + (member.children?.length || 0), 0);
         const averageChildrenPerMember = totalMembers > 0 ? totalChildren / totalMembers : 0;
         let oldestMember, youngestMember;
         for (const member of members) {
-            if (member.personalInfo && typeof member.personalInfo === 'object') {
+            if (member.personalInfo && typeof member.personalInfo === "object") {
                 const birthYear = member.personalInfo.birthYear;
-                if (typeof birthYear === 'number') {
+                if (typeof birthYear === "number") {
                     if (!oldestMember || birthYear < oldestMember.birthYear) {
                         oldestMember = { id: member.id, name: member.name, birthYear };
                     }
@@ -107,12 +104,12 @@ let TreeService = class TreeService {
             case tree_dto_1.TreeFormat.PDF:
                 return this.exportAsPdf(treeData, exportDto);
             default:
-                throw new Error('Unsupported export format');
+                throw new Error("Unsupported export format");
         }
     }
     async verifyFamilyAccess(user, familyId) {
         if (!user.memberId) {
-            throw new common_1.NotFoundException('Member profile not found');
+            throw new common_1.NotFoundException("Member profile not found");
         }
         const membership = await this.prisma.familyMembership.findFirst({
             where: {
@@ -122,7 +119,7 @@ let TreeService = class TreeService {
             },
         });
         if (!membership) {
-            throw new common_1.ForbiddenException('Access denied to this family');
+            throw new common_1.ForbiddenException("Access denied to this family");
         }
     }
     async getVisibleMembers(user, familyId) {
@@ -144,17 +141,17 @@ let TreeService = class TreeService {
         });
         const userFamilyIds = await this.getUserFamilyIds(user.memberId);
         return memberships
-            .filter(membership => {
+            .filter((membership) => {
             if (membership.familyId === familyId)
                 return true;
             return userFamilyIds.includes(membership.familyId);
         })
-            .map(membership => ({
+            .map((membership) => ({
             ...membership.member,
             spouses: [
                 ...membership.member.spouses,
                 ...membership.member.spousesReverse,
-            ].filter((spouse, index, arr) => arr.findIndex(s => s.id === spouse.id) === index),
+            ].filter((spouse, index, arr) => arr.findIndex((s) => s.id === spouse.id) === index),
         }));
     }
     async getUserFamilyIds(memberId) {
@@ -165,7 +162,7 @@ let TreeService = class TreeService {
             },
             select: { familyId: true },
         });
-        return memberships.map(m => m.familyId);
+        return memberships.map((m) => m.familyId);
     }
     async buildTreeStructure(members, centerNodeId) {
         const nodes = [];
@@ -193,7 +190,7 @@ let TreeService = class TreeService {
                 connections.push({
                     from: parent.id,
                     to: member.id,
-                    type: 'parent',
+                    type: "parent",
                     strength: 1.0,
                 });
             });
@@ -203,7 +200,7 @@ let TreeService = class TreeService {
                     connections.push({
                         from: member.id,
                         to: spouse.id,
-                        type: 'spouse',
+                        type: "spouse",
                         strength: 0.8,
                     });
                     processedMembers.add(`${member.id}-${spouse.id}`);
@@ -213,7 +210,7 @@ let TreeService = class TreeService {
                 connections.push({
                     from: member.id,
                     to: child.id,
-                    type: 'child',
+                    type: "child",
                     strength: 1.0,
                 });
             });
@@ -222,11 +219,20 @@ let TreeService = class TreeService {
     }
     calculateNodePositions(members, centerNodeId) {
         const positions = new Map();
-        const memberMap = new Map(members.map(m => [m.id, m]));
+        const memberMap = new Map(members.map((m) => [m.id, m]));
+        const TREE_SPACING = {
+            levelWidth: 800,
+            levelHeight: 400,
+            spouseSpacing: 300,
+            minSiblingSpacing: 500,
+            spouseVerticalOffset: 50,
+        };
         const visited = new Set();
-        const levelWidth = 300;
-        const levelHeight = 150;
-        const queue = [{ id: centerNodeId, level: 0 }];
+        const levelWidth = TREE_SPACING.levelWidth;
+        const levelHeight = TREE_SPACING.levelHeight;
+        const queue = [
+            { id: centerNodeId, level: 0 },
+        ];
         const levelCounts = new Map();
         while (queue.length > 0) {
             const { id, level, parentX } = queue.shift();
@@ -238,8 +244,15 @@ let TreeService = class TreeService {
                 continue;
             const currentLevelCount = levelCounts.get(level) || 0;
             levelCounts.set(level, currentLevelCount + 1);
-            const x = parentX !== undefined ? parentX : currentLevelCount * levelWidth;
-            const y = level * levelHeight;
+            const baseX = parentX !== undefined ? parentX : currentLevelCount * levelWidth;
+            const minSpacing = TREE_SPACING.minSiblingSpacing;
+            const x = Math.max(baseX, (currentLevelCount - 1) * minSpacing + levelWidth / 2);
+            let y = level * levelHeight;
+            const hasNoParents = !member.parents || member.parents.length === 0;
+            const isSpousePosition = parentX !== undefined;
+            if (hasNoParents && isSpousePosition) {
+                y += TREE_SPACING.spouseVerticalOffset;
+            }
             positions.set(id, { x, y, level });
             member.children?.forEach((child) => {
                 if (!visited.has(child.id)) {
@@ -253,14 +266,23 @@ let TreeService = class TreeService {
             });
             member.spouses?.forEach((spouse) => {
                 if (!visited.has(spouse.id)) {
-                    queue.push({ id: spouse.id, level, parentX: x + 100 });
+                    const spouseHasNoParents = !spouse.parents || spouse.parents.length === 0;
+                    const spouseLevel = spouseHasNoParents
+                        ? level +
+                            TREE_SPACING.spouseVerticalOffset / TREE_SPACING.levelHeight
+                        : level;
+                    queue.push({
+                        id: spouse.id,
+                        level: spouseLevel,
+                        parentX: x + TREE_SPACING.spouseSpacing,
+                    });
                 }
             });
         }
         return positions;
     }
     calculateGenerations(nodes, centerNodeId) {
-        const levels = nodes.map(node => node.level);
+        const levels = nodes.map((node) => node.level);
         const minLevel = Math.min(...levels);
         const maxLevel = Math.max(...levels);
         return maxLevel - minLevel + 1;
@@ -268,7 +290,7 @@ let TreeService = class TreeService {
     exportAsJson(treeData, exportDto) {
         const filteredData = {
             ...treeData,
-            nodes: treeData.nodes.map(node => ({
+            nodes: treeData.nodes.map((node) => ({
                 ...node,
                 ...(exportDto.includePersonalInfo ? {} : { personalInfo: undefined }),
             })),
@@ -277,33 +299,45 @@ let TreeService = class TreeService {
     }
     exportAsCsv(treeData, exportDto) {
         const headers = [
-            'ID', 'Name', 'Gender', 'Status', 'Level',
-            'Parents', 'Children', 'Spouses', 'Created', 'Updated'
+            "ID",
+            "Name",
+            "Gender",
+            "Status",
+            "Level",
+            "Parents",
+            "Children",
+            "Spouses",
+            "Created",
+            "Updated",
         ];
         if (exportDto.includePersonalInfo) {
-            headers.push('Personal Info');
+            headers.push("Personal Info");
         }
-        const rows = treeData.nodes.map(node => [
+        const rows = treeData.nodes.map((node) => [
             node.id,
             node.name,
-            node.gender || '',
+            node.gender || "",
             node.status,
             node.level.toString(),
-            node.parentIds.join(';'),
-            node.childrenIds.join(';'),
-            node.spouseIds.join(';'),
+            node.parentIds.join(";"),
+            node.childrenIds.join(";"),
+            node.spouseIds.join(";"),
             node.createdAt.toISOString(),
             node.updatedAt.toISOString(),
-            ...(exportDto.includePersonalInfo ? [JSON.stringify(node.personalInfo || {})] : []),
+            ...(exportDto.includePersonalInfo
+                ? [JSON.stringify(node.personalInfo || {})]
+                : []),
         ]);
-        return [headers, ...rows].map(row => row.join(',')).join('\n');
+        return [headers, ...rows].map((row) => row.join(",")).join("\n");
     }
     exportAsPdf(treeData, exportDto) {
         const content = `Family Tree: ${treeData.familyName}\n\n` +
             `Total Members: ${treeData.totalMembers}\n` +
             `Generations: ${treeData.generations}\n\n` +
-            treeData.nodes.map(node => `${node.name} (${node.gender || 'Unknown'}, ${node.status})`).join('\n');
-        return Buffer.from(content, 'utf-8');
+            treeData.nodes
+                .map((node) => `${node.name} (${node.gender || "Unknown"}, ${node.status})`)
+                .join("\n");
+        return Buffer.from(content, "utf-8");
     }
 };
 exports.TreeService = TreeService;

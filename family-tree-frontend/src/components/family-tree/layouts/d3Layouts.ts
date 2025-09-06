@@ -11,46 +11,79 @@ export const createHierarchicalLayout = (
   // Use the positions that the backend has already calculated
   // The backend performs a proper BFS traversal and calculates positions based on family relationships
 
-  // Calculate bounds of all nodes using backend-calculated positions
-  let minX = Infinity,
-    maxX = -Infinity,
-    minY = Infinity,
+  // Group nodes by generation to find the largest generation for horizontal centering
+  const generations = new Map<number, TreeNode[]>();
+  nodes.forEach((node) => {
+    const generation = node.generation || 0;
+    if (!generations.has(generation)) {
+      generations.set(generation, []);
+    }
+    generations.get(generation)!.push(node);
+  });
+
+  // Find the generation with the most members (largest generation)
+  let largestGeneration = 0;
+  let maxMembers = 0;
+  generations.forEach((genNodes, gen) => {
+    if (genNodes.length > maxMembers) {
+      maxMembers = genNodes.length;
+      largestGeneration = gen;
+    }
+  });
+
+  console.log(
+    `🎯 Largest generation found: Generation ${largestGeneration} with ${maxMembers} members`
+  );
+
+  // Calculate horizontal offset based on the largest generation
+  let horizontalOffset = 0;
+
+  // Calculate the center of the largest generation
+  const largestGenNodes = generations.get(largestGeneration) || [];
+  if (largestGenNodes.length > 0) {
+    const genMinX = Math.min(...largestGenNodes.map((n) => n.x || 0));
+    const genMaxX = Math.max(...largestGenNodes.map((n) => n.x || 0));
+    const largestGenCenterX = (genMinX + genMaxX) / 2;
+
+    // Calculate horizontal offset to center all generations around the largest generation's center
+    const viewportCenterX = width / 2;
+    horizontalOffset = viewportCenterX - largestGenCenterX;
+
+    console.log(
+      `📐 Largest generation center: ${largestGenCenterX.toFixed(
+        1
+      )}, Viewport center: ${viewportCenterX.toFixed(1)}`
+    );
+    console.log(
+      `📏 Applying horizontal offset: ${horizontalOffset.toFixed(1)}`
+    );
+
+    // Apply horizontal centering to all nodes
+    nodes.forEach((node) => {
+      const backendX = node.x || 0;
+      node.x = backendX + horizontalOffset;
+    });
+  }
+
+  // Calculate vertical bounds for vertical centering
+  let minY = Infinity,
     maxY = -Infinity;
 
   nodes.forEach((node) => {
-    // Backend already provides x, y coordinates, but they might need scaling
-    const backendX = node.x || 0;
     const backendY = node.y || 0;
-
-    minX = Math.min(minX, backendX);
-    maxX = Math.max(maxX, backendX);
     minY = Math.min(minY, backendY);
     maxY = Math.max(maxY, backendY);
   });
 
-  // Calculate tree dimensions
-  const treeWidth = maxX - minX || width;
-  const treeHeight = maxY - minY || height;
-
-  // For hierarchical layout, preserve the backend spacing but center the tree
-  // Don't apply scaling that would reduce the spacing
-  const centerX = width / 2;
+  // Calculate vertical centering offset
   const centerY = height / 2;
-  const treeCenterX = (minX + maxX) / 2;
   const treeCenterY = (minY + maxY) / 2;
+  const verticalOffset = centerY - treeCenterY;
 
-  // Calculate offset to center the tree without scaling
-  const offsetX = centerX - treeCenterX;
-  const offsetY = centerY - treeCenterY;
-
-  // Apply centering offset to all nodes (preserve backend spacing)
+  // Apply vertical centering offset to all nodes
   nodes.forEach((node) => {
-    const backendX = node.x || 0;
     const backendY = node.y || 0;
-
-    // Center the tree by applying offset (no scaling to preserve spacing)
-    node.x = backendX + offsetX;
-    node.y = backendY + offsetY;
+    node.y = backendY + verticalOffset;
 
     // Set fixed positions for stability
     node.fx = node.x;
@@ -69,13 +102,15 @@ export const createHierarchicalLayout = (
     }
   });
 
-  console.log("🎯 Hierarchical layout applied using backend positions");
-  console.log(`📐 Tree bounds: (${minX}, ${minY}) to (${maxX}, ${maxY})`);
+  console.log("🎯 Hierarchical layout applied with generation-based centering");
   console.log(
-    `📏 Preserved doubled backend spacing with centering offset: (${offsetX.toFixed(
+    `📐 Tree vertical bounds: ${minY.toFixed(1)} to ${maxY.toFixed(1)}`
+  );
+  console.log(
+    `📏 Applied generation-based horizontal centering with vertical offset: ${verticalOffset.toFixed(
       1
-    )}, ${offsetY.toFixed(1)})`
+    )}`
   );
 
-  return { offsetX, offsetY };
+  return { offsetX: horizontalOffset, offsetY: verticalOffset };
 };

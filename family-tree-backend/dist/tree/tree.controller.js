@@ -18,6 +18,9 @@ const swagger_1 = require("@nestjs/swagger");
 const tree_service_1 = require("./tree.service");
 const tree_dto_1 = require("./dto/tree.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const permissions_guard_1 = require("../auth/permissions.guard");
+const permissions_decorator_1 = require("../auth/permissions.decorator");
+const permissions_enum_1 = require("../auth/permissions.enum");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let TreeController = class TreeController {
     constructor(treeService) {
@@ -35,23 +38,23 @@ let TreeController = class TreeController {
         let filename;
         switch (exportDto.format) {
             case tree_dto_1.TreeFormat.JSON:
-                contentType = 'application/json';
+                contentType = "application/json";
                 filename = `family-tree-${exportDto.familyId}.json`;
                 break;
             case tree_dto_1.TreeFormat.CSV:
-                contentType = 'text/csv';
+                contentType = "text/csv";
                 filename = `family-tree-${exportDto.familyId}.csv`;
                 break;
             case tree_dto_1.TreeFormat.PDF:
-                contentType = 'application/pdf';
+                contentType = "application/pdf";
                 filename = `family-tree-${exportDto.familyId}.pdf`;
                 break;
             default:
-                contentType = 'application/octet-stream';
+                contentType = "application/octet-stream";
                 filename = `family-tree-${exportDto.familyId}`;
         }
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
         if (exportData instanceof Buffer) {
             res.send(exportData);
         }
@@ -86,70 +89,73 @@ let TreeController = class TreeController {
 };
 exports.TreeController = TreeController;
 __decorate([
-    (0, common_1.Get)(':familyId'),
+    (0, common_1.Get)(":familyId"),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.VIEW_TREE),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get family tree',
-        description: 'Get the complete family tree structure for visualization',
+        summary: "Get family tree",
+        description: "Get the complete family tree structure for visualization",
     }),
     (0, swagger_1.ApiQuery)({
-        name: 'centerMemberId',
+        name: "centerMemberId",
         required: false,
-        description: 'ID of the member to center the tree around',
+        description: "ID of the member to center the tree around",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Family tree retrieved successfully',
+        description: "Family tree retrieved successfully",
         type: tree_dto_1.FamilyTreeDto,
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied to this family',
+        description: "Access denied to this family",
     }),
     (0, swagger_1.ApiResponse)({
         status: 404,
-        description: 'Family not found',
+        description: "Family not found",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('familyId')),
-    __param(2, (0, common_1.Query)('centerMemberId')),
+    __param(1, (0, common_1.Param)("familyId")),
+    __param(2, (0, common_1.Query)("centerMemberId")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", Promise)
 ], TreeController.prototype, "getFamilyTree", null);
 __decorate([
-    (0, common_1.Get)(':familyId/statistics'),
+    (0, common_1.Get)(":familyId/statistics"),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.VIEW_TREE),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get family tree statistics',
-        description: 'Get statistical information about the family tree',
+        summary: "Get family tree statistics",
+        description: "Get statistical information about the family tree",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Tree statistics retrieved successfully',
+        description: "Tree statistics retrieved successfully",
         type: tree_dto_1.TreeStatisticsDto,
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied to this family',
+        description: "Access denied to this family",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('familyId')),
+    __param(1, (0, common_1.Param)("familyId")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], TreeController.prototype, "getTreeStatistics", null);
 __decorate([
-    (0, common_1.Post)('export'),
+    (0, common_1.Post)("export"),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.EXPORT_DATA),
     (0, swagger_1.ApiOperation)({
-        summary: 'Export family tree',
-        description: 'Export family tree data in various formats (JSON, CSV, PDF)',
+        summary: "Export family tree",
+        description: "Export family tree data in various formats (JSON, CSV, PDF)",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Tree exported successfully',
+        description: "Tree exported successfully",
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied to this family',
+        description: "Access denied to this family",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
@@ -159,47 +165,49 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], TreeController.prototype, "exportFamilyTree", null);
 __decorate([
-    (0, common_1.Get)(':familyId/relationships/:memberId'),
+    (0, common_1.Get)(":familyId/relationships/:memberId"),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.VIEW_MEMBERS),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get member relationships',
-        description: 'Get detailed relationship information for a specific member',
+        summary: "Get member relationships",
+        description: "Get detailed relationship information for a specific member",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Member relationships retrieved successfully',
+        description: "Member relationships retrieved successfully",
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied to this member',
+        description: "Access denied to this member",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('familyId')),
-    __param(2, (0, common_1.Param)('memberId')),
+    __param(1, (0, common_1.Param)("familyId")),
+    __param(2, (0, common_1.Param)("memberId")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", Promise)
 ], TreeController.prototype, "getMemberRelationships", null);
 __decorate([
-    (0, common_1.Get)(':familyId/generations'),
+    (0, common_1.Get)(":familyId/generations"),
+    (0, permissions_decorator_1.Permissions)(permissions_enum_1.FamilyPermission.VIEW_TREE),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get generation breakdown',
-        description: 'Get members organized by generation levels',
+        summary: "Get generation breakdown",
+        description: "Get members organized by generation levels",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Generation breakdown retrieved successfully',
+        description: "Generation breakdown retrieved successfully",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('familyId')),
+    __param(1, (0, common_1.Param)("familyId")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], TreeController.prototype, "getGenerationBreakdown", null);
 exports.TreeController = TreeController = __decorate([
-    (0, swagger_1.ApiTags)('Family Tree'),
+    (0, swagger_1.ApiTags)("Family Tree"),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, common_1.Controller)('tree'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.Controller)("tree"),
     __metadata("design:paramtypes", [tree_service_1.TreeService])
 ], TreeController);
 //# sourceMappingURL=tree.controller.js.map

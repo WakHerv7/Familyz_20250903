@@ -1,6 +1,6 @@
-import { MemberService } from './member.service';
-import { UpdateMemberProfileDto, AddRelationshipDto, RemoveRelationshipDto, BulkRelationshipDto, CreateMemberDto, MemberRelationshipsResponseDto, MemberResponseDto } from './dto/member.dto';
-import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { MemberService } from "./member.service";
+import { UpdateMemberProfileDto, AddRelationshipDto, RemoveRelationshipDto, BulkRelationshipDto, CreateMemberDto, MemberRelationshipsResponseDto, MemberResponseDto } from "./dto/member.dto";
+import { AuthenticatedUser } from "../auth/strategies/jwt.strategy";
 export declare class MemberController {
     private readonly memberService;
     constructor(memberService: MemberService);

@@ -1,32 +1,54 @@
-'use client';
+"use client";
 
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useProfile, useUpdateProfile, useUploadProfileImage } from '@/hooks/api';
-import { updateProfileSchema, UpdateProfileFormData } from '@/schemas/member';
-import { Gender, MemberStatus, UploadedFile } from '@/types';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import ImageUpload from '@/components/ImageUpload';
-import { ClipLoader } from 'react-spinners';
-import { User, Camera } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  useProfile,
+  useUpdateProfile,
+  useUploadProfileImage,
+} from "@/hooks/api";
+import { updateProfileSchema, UpdateProfileFormData } from "@/schemas/member";
+import { Gender, MemberStatus, UploadedFile } from "@/types";
+import {
+  CustomDialog,
+  CustomDialogContent,
+  CustomDialogDescription,
+  CustomDialogHeader,
+  CustomDialogTitle,
+  CustomDialogClose,
+} from "@/components/ui/custom-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import ImageUpload from "@/components/ImageUpload";
+import { ClipLoader } from "react-spinners";
+import { User, Camera } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export default function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
+export default function SettingsDialog({
+  open,
+  onOpenChange,
+}: SettingsDialogProps) {
   const { data: profile, isLoading } = useProfile();
   const updateProfileMutation = useUpdateProfile();
   const uploadProfileImageMutation = useUploadProfileImage();
-  const [profileImageFiles, setProfileImageFiles] = useState<UploadedFile[]>([]);
+  const [profileImageFiles, setProfileImageFiles] = useState<UploadedFile[]>(
+    []
+  );
 
   const {
     register,
@@ -46,43 +68,45 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
         gender: profile.gender,
         status: profile.status,
         personalInfo: {
-          bio: profile.personalInfo?.bio || '',
-          birthDate: profile.personalInfo?.birthDate || '',
-          birthPlace: profile.personalInfo?.birthPlace || '',
-          occupation: profile.personalInfo?.occupation || '',
-          phoneNumber: profile.personalInfo?.phoneNumber || '',
-          email: profile.personalInfo?.email || '',
+          bio: profile.personalInfo?.bio || "",
+          birthDate: profile.personalInfo?.birthDate || "",
+          birthPlace: profile.personalInfo?.birthPlace || "",
+          occupation: profile.personalInfo?.occupation || "",
+          phoneNumber: profile.personalInfo?.phoneNumber || "",
+          email: profile.personalInfo?.email || "",
           socialLinks: {
-            facebook: profile.personalInfo?.socialLinks?.facebook || '',
-            twitter: profile.personalInfo?.socialLinks?.twitter || '',
-            linkedin: profile.personalInfo?.socialLinks?.linkedin || '',
-            instagram: profile.personalInfo?.socialLinks?.instagram || '',
+            facebook: profile.personalInfo?.socialLinks?.facebook || "",
+            twitter: profile.personalInfo?.socialLinks?.twitter || "",
+            linkedin: profile.personalInfo?.socialLinks?.linkedin || "",
+            instagram: profile.personalInfo?.socialLinks?.instagram || "",
           },
         },
       });
 
       // Set profile image if exists
       if (profile.personalInfo?.profileImage) {
-        setProfileImageFiles([{
-          id: profile.personalInfo.profileImageId || 'current',
-          filename: 'profile-image',
-          originalName: 'Profile Image',
-          mimeType: 'image/jpeg',
-          size: 0,
-          url: profile.personalInfo.profileImage,
-          type: 'IMAGE' as any,
-          uploadedBy: profile.id,
-          uploadedAt: new Date(),
-        }]);
+        setProfileImageFiles([
+          {
+            id: profile.personalInfo.profileImageId || "current",
+            filename: "profile-image",
+            originalName: "Profile Image",
+            mimeType: "image/jpeg",
+            size: 0,
+            url: profile.personalInfo.profileImage,
+            type: "IMAGE" as any,
+            uploadedBy: profile.id,
+            uploadedAt: new Date(),
+          },
+        ]);
       }
     }
   }, [profile, open, reset]);
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   };
@@ -118,21 +142,25 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
   const onSubmit = async (data: UpdateProfileFormData) => {
     try {
       // Clean up social links - remove empty strings
-      const cleanedSocialLinks = data.personalInfo?.socialLinks ? {
-        facebook: data.personalInfo.socialLinks.facebook || undefined,
-        twitter: data.personalInfo.socialLinks.twitter || undefined,
-        linkedin: data.personalInfo.socialLinks.linkedin || undefined,
-        instagram: data.personalInfo.socialLinks.instagram || undefined,
-      } : undefined;
+      const cleanedSocialLinks = data.personalInfo?.socialLinks
+        ? {
+            facebook: data.personalInfo.socialLinks.facebook || undefined,
+            twitter: data.personalInfo.socialLinks.twitter || undefined,
+            linkedin: data.personalInfo.socialLinks.linkedin || undefined,
+            instagram: data.personalInfo.socialLinks.instagram || undefined,
+          }
+        : undefined;
 
       // Prepare updated personal info
-      const updatedPersonalInfo = data.personalInfo ? {
-        ...data.personalInfo,
-        socialLinks: cleanedSocialLinks,
-        // Preserve existing profile image data
-        profileImage: profile?.personalInfo?.profileImage,
-        profileImageId: profile?.personalInfo?.profileImageId,
-      } : undefined;
+      const updatedPersonalInfo = data.personalInfo
+        ? {
+            ...data.personalInfo,
+            socialLinks: cleanedSocialLinks,
+            // Preserve existing profile image data
+            profileImage: profile?.personalInfo?.profileImage,
+            profileImageId: profile?.personalInfo?.profileImageId,
+          }
+        : undefined;
 
       await updateProfileMutation.mutateAsync({
         name: data.name,
@@ -143,34 +171,35 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 
       onOpenChange(false);
     } catch (error) {
-      console.error('Failed to update profile:', error);
+      console.error("Failed to update profile:", error);
     }
   };
 
   if (isLoading) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+      <CustomDialog open={open} onOpenChange={onOpenChange}>
+        <CustomDialogContent>
           <div className="flex items-center justify-center py-8">
             <ClipLoader size={32} color="#3B82F6" />
           </div>
-        </DialogContent>
-      </Dialog>
+        </CustomDialogContent>
+      </CustomDialog>
     );
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
+    <CustomDialog open={open} onOpenChange={onOpenChange}>
+      <CustomDialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <CustomDialogHeader>
+          <CustomDialogTitle className="flex items-center space-x-2">
             <User className="h-5 w-5" />
             <span>Profile Settings</span>
-          </DialogTitle>
-          <DialogDescription>
+          </CustomDialogTitle>
+          <CustomDialogDescription>
             Update your personal information and family tree profile.
-          </DialogDescription>
-        </DialogHeader>
+          </CustomDialogDescription>
+          <CustomDialogClose onClick={() => onOpenChange(false)} />
+        </CustomDialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Profile Image Section */}
@@ -192,7 +221,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                     />
                   ) : (
                     <AvatarFallback className="text-xl">
-                      {profile ? getInitials(profile.name) : 'U'}
+                      {profile ? getInitials(profile.name) : "U"}
                     </AvatarFallback>
                   )}
                 </Avatar>
@@ -207,7 +236,12 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                   existingFiles={profileImageFiles}
                   maxFiles={1}
                   maxSizeMB={5}
-                  acceptedTypes={['image/jpeg', 'image/png', 'image/gif', 'image/webp']}
+                  acceptedTypes={[
+                    "image/jpeg",
+                    "image/png",
+                    "image/gif",
+                    "image/webp",
+                  ]}
                   variant="profile"
                 />
               </div>
@@ -223,7 +257,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 <Label htmlFor="name">Full Name</Label>
                 <Input
                   id="name"
-                  {...register('name')}
+                  {...register("name")}
                   placeholder="Enter your full name"
                 />
                 {errors.name && (
@@ -234,14 +268,16 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender</Label>
                 <Select
-                  onValueChange={(value) => setValue('gender', value as Gender)}
+                  onValueChange={(value) => setValue("gender", value as Gender)}
                   defaultValue={profile?.gender}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={Gender.PREFER_NOT_TO_SAY}>Prefer not to say</SelectItem>
+                    <SelectItem value={Gender.PREFER_NOT_TO_SAY}>
+                      Prefer not to say
+                    </SelectItem>
                     <SelectItem value={Gender.MALE}>Male</SelectItem>
                     <SelectItem value={Gender.FEMALE}>Female</SelectItem>
                     <SelectItem value={Gender.OTHER}>Other</SelectItem>
@@ -253,7 +289,9 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select
-                onValueChange={(value) => setValue('status', value as MemberStatus)}
+                onValueChange={(value) =>
+                  setValue("status", value as MemberStatus)
+                }
                 defaultValue={profile?.status}
               >
                 <SelectTrigger>
@@ -261,8 +299,12 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={MemberStatus.ACTIVE}>Active</SelectItem>
-                  <SelectItem value={MemberStatus.INACTIVE}>Inactive</SelectItem>
-                  <SelectItem value={MemberStatus.DECEASED}>Deceased</SelectItem>
+                  <SelectItem value={MemberStatus.INACTIVE}>
+                    Inactive
+                  </SelectItem>
+                  <SelectItem value={MemberStatus.DECEASED}>
+                    Deceased
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -270,13 +312,15 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 
           {/* Personal Information */}
           <div className="space-y-4">
-            <Label className="text-base font-medium">Personal Information</Label>
+            <Label className="text-base font-medium">
+              Personal Information
+            </Label>
 
             <div className="space-y-2">
               <Label htmlFor="bio">Biography</Label>
               <Textarea
                 id="bio"
-                {...register('personalInfo.bio')}
+                {...register("personalInfo.bio")}
                 placeholder="Tell us about yourself"
                 rows={3}
               />
@@ -288,7 +332,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 <Input
                   id="birthDate"
                   type="date"
-                  {...register('personalInfo.birthDate')}
+                  {...register("personalInfo.birthDate")}
                 />
               </div>
 
@@ -296,7 +340,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 <Label htmlFor="birthPlace">Birth Place</Label>
                 <Input
                   id="birthPlace"
-                  {...register('personalInfo.birthPlace')}
+                  {...register("personalInfo.birthPlace")}
                   placeholder="City, Country"
                 />
               </div>
@@ -306,7 +350,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
               <Label htmlFor="occupation">Occupation</Label>
               <Input
                 id="occupation"
-                {...register('personalInfo.occupation')}
+                {...register("personalInfo.occupation")}
                 placeholder="Your profession or job title"
               />
             </div>
@@ -322,7 +366,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 <Input
                   id="phoneNumber"
                   type="tel"
-                  {...register('personalInfo.phoneNumber')}
+                  {...register("personalInfo.phoneNumber")}
                   placeholder="+1234567890"
                 />
               </div>
@@ -332,11 +376,13 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 <Input
                   id="email"
                   type="email"
-                  {...register('personalInfo.email')}
+                  {...register("personalInfo.email")}
                   placeholder="your.email@example.com"
                 />
                 {errors.personalInfo?.email && (
-                  <p className="text-red-500 text-sm">{errors.personalInfo.email.message}</p>
+                  <p className="text-red-500 text-sm">
+                    {errors.personalInfo.email.message}
+                  </p>
                 )}
               </div>
             </div>
@@ -344,14 +390,16 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 
           {/* Social Links */}
           <div className="space-y-4">
-            <Label className="text-base font-medium">Social Media (Optional)</Label>
+            <Label className="text-base font-medium">
+              Social Media (Optional)
+            </Label>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="facebook">Facebook</Label>
                 <Input
                   id="facebook"
-                  {...register('personalInfo.socialLinks.facebook')}
+                  {...register("personalInfo.socialLinks.facebook")}
                   placeholder="https://facebook.com/yourprofile"
                 />
               </div>
@@ -360,7 +408,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 <Label htmlFor="twitter">Twitter</Label>
                 <Input
                   id="twitter"
-                  {...register('personalInfo.socialLinks.twitter')}
+                  {...register("personalInfo.socialLinks.twitter")}
                   placeholder="https://twitter.com/yourhandle"
                 />
               </div>
@@ -369,7 +417,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 <Label htmlFor="linkedin">LinkedIn</Label>
                 <Input
                   id="linkedin"
-                  {...register('personalInfo.socialLinks.linkedin')}
+                  {...register("personalInfo.socialLinks.linkedin")}
                   placeholder="https://linkedin.com/in/yourprofile"
                 />
               </div>
@@ -378,7 +426,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 <Label htmlFor="instagram">Instagram</Label>
                 <Input
                   id="instagram"
-                  {...register('personalInfo.socialLinks.instagram')}
+                  {...register("personalInfo.socialLinks.instagram")}
                   placeholder="https://instagram.com/yourhandle"
                 />
               </div>
@@ -391,13 +439,19 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={updateProfileMutation.isPending || uploadProfileImageMutation.isPending}
+              disabled={
+                updateProfileMutation.isPending ||
+                uploadProfileImageMutation.isPending
+              }
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={updateProfileMutation.isPending || uploadProfileImageMutation.isPending}
+              disabled={
+                updateProfileMutation.isPending ||
+                uploadProfileImageMutation.isPending
+              }
             >
               {updateProfileMutation.isPending ? (
                 <div className="flex items-center space-x-2">
@@ -405,12 +459,12 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                   <span>Saving...</span>
                 </div>
               ) : (
-                'Save Changes'
+                "Save Changes"
               )}
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CustomDialogContent>
+    </CustomDialog>
   );
 }

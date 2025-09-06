@@ -1,7 +1,7 @@
-import { Response } from 'express';
-import { TreeService } from './tree.service';
-import { FamilyTreeDto, ExportTreeDto, TreeStatisticsDto } from './dto/tree.dto';
-import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { Response } from "express";
+import { TreeService } from "./tree.service";
+import { FamilyTreeDto, ExportTreeDto, TreeStatisticsDto } from "./dto/tree.dto";
+import { AuthenticatedUser } from "../auth/strategies/jwt.strategy";
 export declare class TreeController {
     private readonly treeService;
     constructor(treeService: TreeService);

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Loader2 } from "lucide-react";
+import { Users, Loader2, Network } from "lucide-react";
 
 // Import our modular components and utilities
 import {
@@ -24,8 +24,16 @@ import {
 } from "./utils";
 import { createHierarchicalLayout } from "./layouts";
 import { useTreeZoom } from "./hooks";
-import { FamilyTreeItem, TreeControls, TreeLegend } from "./components";
+import {
+  FamilyTreeItem,
+  TreeControls,
+  TreeLegend,
+  ExplorerView,
+  VisualTreeView,
+} from "./components";
 import { TREE_SPACING } from "./config/spacing";
+import SvgFamilyTree from "./SvgFamilyTree";
+import FolderTreeView from "@/components/FolderTreeView";
 
 // Import the new tree hooks
 import {
@@ -41,7 +49,7 @@ export default function InteractiveFamilyTree({
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [viewMode, setViewMode] = useState<ViewMode>("hierarchical");
+  const [viewMode, setViewMode] = useState<ViewMode>("explorer");
 
   // Get user's families to determine the correct family ID
   const { data: userFamilies } = useFamilies();
@@ -101,12 +109,12 @@ export default function InteractiveFamilyTree({
   } = useTreeZoom(containerRef);
 
   // Auto-fit to screen when tree data changes (for visual views only)
-  useEffect(() => {
-    if (treeData?.nodes?.length && viewMode !== "explorer" && !treeLoading) {
-      console.log("🔍 Auto-fitting tree to screen for optimal viewing...");
-      autoFitToScreen();
-    }
-  }, [treeData, viewMode, treeLoading, autoFitToScreen]);
+  // useEffect(() => {
+  //   if (treeData?.nodes?.length && viewMode !== "explorer" && !treeLoading) {
+  //     console.log("🔍 Auto-fitting tree to screen for optimal viewing...");
+  //     autoFitToScreen();
+  //   }
+  // }, [treeData, viewMode, treeLoading, autoFitToScreen]);
 
   const downloadSVG = () => {
     if (!svgRef.current) return;
@@ -587,8 +595,8 @@ export default function InteractiveFamilyTree({
   const memberCount = treeData?.metadata?.totalMembers || nodes.length;
 
   return (
-    <Card className="w-full">
-      <CardHeader>
+    <div className="w-full">
+      {/* <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center space-x-2">
             <Users className="h-5 w-5" />
@@ -601,182 +609,68 @@ export default function InteractiveFamilyTree({
                 Zoom: {Math.round(zoomLevel * 100)}%
               </Badge>
             )}
-            <Badge
-              variant={
-                viewMode === "hierarchical"
-                  ? "default"
-                  : viewMode === "force"
-                  ? "default"
-                  : "outline"
-              }
-            >
-              {viewMode === "explorer"
-                ? "Explorer"
-                : viewMode === "hierarchical"
-                ? "Hierarchical"
-                : "Force"}
-            </Badge>
           </div>
         </div>
-      </CardHeader>
+      </CardHeader> */}
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-4 w-full">
           {/* Controls */}
-          <div className="flex items-center justify-between">
-            <TreeControls
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              onZoomIn={handleZoomIn}
-              onZoomOut={handleZoomOut}
-              onReset={handleReset}
-              onFitToScreen={handleFitToScreen}
-              onDownload={downloadSVG}
-            />
+          <TreeControls
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onReset={handleReset}
+            onFitToScreen={handleFitToScreen}
+            onDownload={downloadSVG}
+          />
 
-            {/* Legend - only for visual modes */}
-            {viewMode !== "explorer" && <TreeLegend />}
-          </div>
+          {/* Legend - only for visual modes */}
+          {/* {viewMode !== "explorer" && (
+            <div className="flex justify-end">
+              <TreeLegend />
+            </div>
+          )} */}
 
           {/* Dynamic View Content */}
           {viewMode === "explorer" ? (
-            /* Explorer View */
-            <Card className="border-gray-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center space-x-2">
-                  <Users className="h-5 w-5" />
-                  <span>Family Tree Explorer</span>
-                </CardTitle>
-                <div className="text-sm text-gray-600">
-                  Complete family tree from oldest ancestor to present
-                  generation
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                {treeLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                    <span>Loading family tree...</span>
-                  </div>
-                ) : treeError ? (
-                  <div className="text-center py-8 text-red-600">
-                    <p>Failed to load family tree</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {treeError.message || "Please try again later"}
-                    </p>
-                    {treeError.message?.includes("Access denied") && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        You may not have access to this family. Try logging in
-                        again or contact the family administrator.
-                      </p>
-                    )}
-                    <Button
-                      onClick={() => refetchTree()}
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                    >
-                      Retry
-                    </Button>
-                  </div>
-                ) : !familyId ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Users className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                    <p>No family access available</p>
-                    <p className="text-sm">
-                      You need to be a member of a family to view the family
-                      tree. Try logging in again or contact your family
-                      administrator.
-                    </p>
-                  </div>
-                ) : nodes.length > 0 ? (
-                  <div className="max-h-96 overflow-y-auto border rounded-lg bg-gray-50">
-                    {/* Use the new API data tree builder */}
-                    {(() => {
-                      const familyTreeRoot =
-                        treeData &&
-                        treeData.nodes &&
-                        Array.isArray(treeData.nodes)
-                          ? buildFamilyTreeFromApiData(treeData)
-                          : null;
-                      return familyTreeRoot ? (
-                        <FamilyTreeItem
-                          node={familyTreeRoot}
-                          level={0}
-                          onMemberClick={onMemberClick}
-                          currentMemberId={currentMember.id}
-                          expandedNodes={expandedNodes}
-                          onToggleExpansion={toggleNodeExpansion}
-                        />
-                      ) : (
-                        <div className="text-center py-4 text-gray-500">
-                          Unable to build family tree structure
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <Users className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                    <p>No family tree data available</p>
-                    <p className="text-sm">
-                      Try switching to a different view mode
-                    </p>
-                  </div>
-                )}
-                <div className="text-xs text-gray-500 mt-2">
-                  Click the arrows to expand/collapse family branches • Click
-                  names to view details
-                </div>
-              </CardContent>
-            </Card>
+            <FolderTreeView
+              currentMember={currentMember}
+              onMemberClick={onMemberClick}
+            />
+          ) : // <ExplorerView
+          //   treeData={treeData}
+          //   treeLoading={treeLoading}
+          //   treeError={treeError}
+          //   refetchTree={refetchTree}
+          //   familyId={familyId}
+          //   nodes={nodes}
+          //   onMemberClick={onMemberClick}
+          //   currentMemberId={currentMember.id}
+          //   expandedNodes={expandedNodes}
+          //   toggleNodeExpansion={toggleNodeExpansion}
+          // />
+          viewMode === "folder" ? (
+            /* Folder Tree View */
+            <FolderTreeView
+              currentMember={currentMember}
+              onMemberClick={onMemberClick}
+            />
+          ) : viewMode === "svg" ? (
+            /* SVG Tree View */
+            <SvgFamilyTree
+              currentMember={currentMember}
+              onMemberClick={onMemberClick}
+              treeData={treeData}
+              isLoading={treeLoading}
+              error={treeError}
+            />
           ) : (
-            /* Visual Tree Views (Hierarchical & Force) */
-            <>
-              <div
-                ref={containerRef}
-                className="w-full h-96 border rounded-lg overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50"
-                style={{ minHeight: "500px" }}
-              >
-                <svg
-                  ref={svgRef}
-                  width="100%"
-                  height="100%"
-                  className="cursor-move"
-                />
-              </div>
-
-              {/* Instructions */}
-              <div className="text-sm text-gray-600 space-y-1">
-                <p>
-                  •{" "}
-                  <strong>
-                    {viewMode === "force"
-                      ? "Drag nodes to rearrange"
-                      : "Click nodes to explore"}
-                  </strong>{" "}
-                  the family tree
-                </p>
-                <p>
-                  • <strong>Click nodes</strong> to view member details
-                </p>
-                <p>
-                  • <strong>Scroll or use controls</strong> to zoom in/out
-                </p>
-                <p>
-                  • <strong>Drag background</strong> to pan around the tree
-                </p>
-                <p>
-                  • <strong>Generation rings:</strong> Blue (parents), Amber
-                  (same), Green (children)
-                </p>
-                <p>
-                  • <strong>Current view:</strong>{" "}
-                  {viewMode === "hierarchical"
-                    ? "Structured layout"
-                    : "Dynamic force layout"}
-                </p>
-              </div>
-            </>
+            <VisualTreeView
+              viewMode={viewMode}
+              containerRef={containerRef}
+              svgRef={svgRef}
+            />
           )}
 
           {/* Selected Member Info */}
@@ -853,6 +747,6 @@ export default function InteractiveFamilyTree({
           )}
         </div>
       </CardContent>
-    </Card>
+    </div>
   );
 }

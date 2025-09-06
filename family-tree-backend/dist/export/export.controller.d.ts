@@ -1,5 +1,5 @@
-import { Response } from 'express';
-import { ExportService } from './export.service';
+import { Response } from "express";
+import { ExportService } from "./export.service";
 interface AuthenticatedRequest extends Request {
     user: {
         sub: string;
@@ -7,16 +7,16 @@ interface AuthenticatedRequest extends Request {
     };
 }
 interface ExportConfig {
-    formats: ('pdf' | 'excel')[];
+    formats: ("pdf" | "excel")[];
     familyTree: {
-        structure: 'folderTree' | 'traditional' | 'interactive';
+        structure: "folderTree" | "traditional" | "interactive" | "textTree";
         includeMembersList: boolean;
-        memberDetails: ('parent' | 'children' | 'spouses' | 'personalInfo' | 'contact')[];
+        memberDetails: ("parent" | "children" | "spouses" | "personalInfo" | "contact")[];
     };
 }
 interface ExportRequest {
-    format: 'pdf' | 'excel';
-    scope: 'current-family' | 'all-families' | 'selected-families';
+    format: "pdf" | "excel";
+    scope: "current-family" | "all-families" | "selected-families";
     familyIds?: string[];
     config: ExportConfig;
     includeData: {
@@ -49,6 +49,23 @@ export declare class ExportController {
     private exportService;
     constructor(exportService: ExportService);
     getFolderTreeData(req: AuthenticatedRequest): Promise<FolderTreeExportData>;
-    exportFamilyData(exportRequest: ExportRequest, req: AuthenticatedRequest, res: Response): Promise<void>;
+    getExplorerTreeData(req: AuthenticatedRequest): Promise<{
+        column: number;
+        value: string;
+    }[]>;
+    getFolderTreeDataWithIds(req: AuthenticatedRequest): Promise<{
+        column: number;
+        value: string;
+        memberIds: {
+            id: string;
+            name: string;
+            gender: string;
+        }[];
+    }[]>;
+    downloadFile(filename: string, res: Response): Promise<void>;
+    exportFamilyData(exportRequest: ExportRequest, req: AuthenticatedRequest): Promise<{
+        downloadUrl: string;
+        filename: string;
+    }>;
 }
 export {};

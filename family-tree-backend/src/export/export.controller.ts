@@ -6,11 +6,13 @@ import {
   UseGuards,
   Request,
   Res,
+  Param,
   BadRequestException,
-} from '@nestjs/common';
-import { Response } from 'express';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ExportService } from './export.service';
+} from "@nestjs/common";
+import { Response } from "express";
+import * as path from "path";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { ExportService } from "./export.service";
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -20,17 +22,23 @@ interface AuthenticatedRequest extends Request {
 }
 
 interface ExportConfig {
-  formats: ('pdf' | 'excel')[];
+  formats: ("pdf" | "excel")[];
   familyTree: {
-    structure: 'folderTree' | 'traditional' | 'interactive';
+    structure: "folderTree" | "traditional" | "interactive" | "textTree";
     includeMembersList: boolean;
-    memberDetails: ('parent' | 'children' | 'spouses' | 'personalInfo' | 'contact')[];
+    memberDetails: (
+      | "parent"
+      | "children"
+      | "spouses"
+      | "personalInfo"
+      | "contact"
+    )[];
   };
 }
 
 interface ExportRequest {
-  format: 'pdf' | 'excel';
-  scope: 'current-family' | 'all-families' | 'selected-families';
+  format: "pdf" | "excel";
+  scope: "current-family" | "all-families" | "selected-families";
   familyIds?: string[];
   config: ExportConfig;
   includeData: {
@@ -61,64 +69,107 @@ interface FolderTreeExportData {
   exportConfig: ExportConfig;
 }
 
-@Controller('export')
-@UseGuards(JwtAuthGuard)
+@Controller("export")
 export class ExportController {
   constructor(private exportService: ExportService) {}
 
-  @Get('folder-tree-data')
+  @Get("folder-tree-data")
+  @UseGuards(JwtAuthGuard)
   async getFolderTreeData(
-    @Request() req: AuthenticatedRequest,
+    @Request() req: AuthenticatedRequest
   ): Promise<FolderTreeExportData> {
     return await this.exportService.getFolderTreeData(req.user.memberId);
   }
 
-  @Post('family-data')
+  @Get("explorer-tree-data")
+  @UseGuards(JwtAuthGuard)
+  async getExplorerTreeData(
+    @Request() req: AuthenticatedRequest
+  ): Promise<{ column: number; value: string }[]> {
+    return await this.exportService.getExplorerTreeData(req.user.memberId);
+  }
+
+  @Get("folder-tree-data-with-ids")
+  @UseGuards(JwtAuthGuard)
+  async getFolderTreeDataWithIds(
+    @Request() req: AuthenticatedRequest
+  ): Promise<
+    {
+      column: number;
+      value: string;
+      memberIds: { id: string; name: string; gender: string }[];
+    }[]
+  > {
+    return await this.exportService.getFolderTreeDataWithIds(req.user.memberId);
+  }
+
+  @Get("download/:filename")
+  async downloadFile(
+    @Param("filename") filename: string,
+    @Res() res: Response
+  ): Promise<void> {
+    try {
+      const filePath = path.join(
+        __dirname,
+        "..",
+        "..",
+        "public",
+        "exports",
+        filename
+      );
+
+      // Check if file exists
+      if (!require("fs").existsSync(filePath)) {
+        throw new BadRequestException("File not found");
+      }
+
+      // Set appropriate headers based on file extension
+      const ext = filename.split(".").pop()?.toLowerCase();
+      let contentType = "application/octet-stream";
+
+      if (ext === "pdf") {
+        contentType = "application/pdf";
+      } else if (ext === "xlsx" || ext === "xls") {
+        contentType =
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      }
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`
+      );
+      res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+
+      // Stream the file
+      const fileStream = require("fs").createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error("Download failed:", error);
+      throw new BadRequestException("Download failed: " + error.message);
+    }
+  }
+
+  @Post("family-data")
+  @UseGuards(JwtAuthGuard)
   async exportFamilyData(
     @Body() exportRequest: ExportRequest,
-    @Request() req: AuthenticatedRequest,
-    @Res() res: Response,
-  ): Promise<void> {
+    @Request() req: AuthenticatedRequest
+  ): Promise<{ downloadUrl: string; filename: string }> {
     if (!exportRequest.format || !exportRequest.scope) {
-      throw new BadRequestException('Format and scope are required');
+      throw new BadRequestException("Format and scope are required");
     }
 
     try {
-      const exportData = await this.exportService.exportFamilyData(
+      const result = await this.exportService.exportFamilyData(
         req.user.memberId,
-        exportRequest,
+        exportRequest
       );
 
-      // Set appropriate headers based on format
-      let contentType: string;
-      let filename: string;
-      let fileExtension: string;
-
-      switch (exportRequest.format) {
-        case 'pdf':
-          contentType = 'application/pdf';
-          fileExtension = 'pdf';
-          break;
-        case 'excel':
-          contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-          fileExtension = 'xlsx';
-          break;
-        default:
-          contentType = 'application/octet-stream';
-          fileExtension = 'bin';
-      }
-
-      const timestamp = new Date().toISOString().split('T')[0];
-      filename = `family-tree-${exportRequest.format}-${timestamp}.${fileExtension}`;
-
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-
-      res.send(exportData);
+      return result;
     } catch (error) {
-      console.error('Export failed:', error);
-      throw new BadRequestException('Export failed: ' + error.message);
+      console.error("Export failed:", error);
+      throw new BadRequestException("Export failed: " + error.message);
     }
   }
 }

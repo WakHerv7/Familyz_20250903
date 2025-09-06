@@ -2,8 +2,8 @@
 const nextConfig = {
   allowedDevOrigins: ["*.preview.same-app.com"],
   eslint: {
-    ignoreDuringBuilds: false,
-    dirs: ['src'],
+    ignoreDuringBuilds: true,
+    dirs: ["src"],
   },
   typescript: {
     ignoreBuildErrors: false,

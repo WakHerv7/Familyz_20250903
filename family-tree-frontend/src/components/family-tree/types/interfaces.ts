@@ -32,4 +32,4 @@ export interface InteractiveFamilyTreeProps {
   onMemberClick?: (memberId: string) => void;
 }
 
-export type ViewMode = "explorer" | "hierarchical" | "force";
+export type ViewMode = "explorer" | "hierarchical" | "force" | "svg" | "folder";

@@ -1,0 +1,10 @@
+import { FamilyPermission } from "./permissions.enum";
+export declare const Permissions: (...permissions: FamilyPermission[]) => import("@nestjs/common").CustomDecorator<string>;
+export declare const RequirePermission: (permission: FamilyPermission) => import("@nestjs/common").CustomDecorator<string>;
+export declare const RequireAdmin: () => import("@nestjs/common").CustomDecorator<string>;
+export declare const RequireMemberManagement: () => import("@nestjs/common").CustomDecorator<string>;
+export declare const RequireInvitationManagement: () => import("@nestjs/common").CustomDecorator<string>;
+export declare const RequireContentManagement: () => import("@nestjs/common").CustomDecorator<string>;
+export declare const RequireCommunication: () => import("@nestjs/common").CustomDecorator<string>;
+export declare const RequireModeration: () => import("@nestjs/common").CustomDecorator<string>;
+export declare const RequireViewing: () => import("@nestjs/common").CustomDecorator<string>;

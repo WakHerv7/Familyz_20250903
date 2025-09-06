@@ -1,6 +1,6 @@
-import { PrismaService } from '../prisma/prisma.service';
-import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
-import { FamilyTreeDto, ExportTreeDto, TreeStatisticsDto } from './dto/tree.dto';
+import { PrismaService } from "../prisma/prisma.service";
+import { AuthenticatedUser } from "../auth/strategies/jwt.strategy";
+import { FamilyTreeDto, ExportTreeDto, TreeStatisticsDto } from "./dto/tree.dto";
 export declare class TreeService {
     private prisma;
     constructor(prisma: PrismaService);

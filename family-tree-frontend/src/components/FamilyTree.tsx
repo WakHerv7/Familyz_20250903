@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api';
-import { MemberWithRelationships, Gender, MemberStatus } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import RelationshipManager from '@/components/RelationshipManager';
-import { Users, Heart, UserCheck } from 'lucide-react';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api";
+import { MemberWithRelationships, Gender, MemberStatus } from "@/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import RelationshipManager from "@/components/RelationshipManager";
+import { Users, Heart, UserCheck } from "lucide-react";
 
 interface TreeNodeProps {
   member: MemberWithRelationships;
@@ -18,34 +18,38 @@ interface TreeNodeProps {
   onMemberClick?: (member: MemberWithRelationships) => void;
 }
 
-const TreeNode: React.FC<TreeNodeProps> = ({ member, isCurrentUser, onMemberClick }) => {
+const TreeNode: React.FC<TreeNodeProps> = ({
+  member,
+  isCurrentUser,
+  onMemberClick,
+}) => {
   const getGenderColor = (gender?: Gender) => {
     switch (gender) {
       case Gender.MALE:
-        return 'bg-blue-100 text-blue-800';
+        return "bg-blue-100 text-blue-800";
       case Gender.FEMALE:
-        return 'bg-pink-100 text-pink-800';
+        return "bg-pink-100 text-pink-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getStatusColor = (status: MemberStatus) => {
     switch (status) {
       case MemberStatus.ACTIVE:
-        return 'bg-green-100 text-green-800';
+        return "bg-green-100 text-green-800";
       case MemberStatus.DECEASED:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
       default:
-        return 'bg-yellow-100 text-yellow-800';
+        return "bg-yellow-100 text-yellow-800";
     }
   };
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
       .toUpperCase()
       .slice(0, 2);
   };
@@ -53,7 +57,9 @@ const TreeNode: React.FC<TreeNodeProps> = ({ member, isCurrentUser, onMemberClic
   return (
     <div
       className={`p-3 border rounded-lg transition-all cursor-pointer hover:shadow-md ${
-        isCurrentUser ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+        isCurrentUser
+          ? "border-green-500 bg-green-50"
+          : "border-gray-200 bg-white"
       }`}
       onClick={() => onMemberClick?.(member)}
     >
@@ -71,15 +77,16 @@ const TreeNode: React.FC<TreeNodeProps> = ({ member, isCurrentUser, onMemberClic
                 {member.gender}
               </Badge>
             )}
-            <Badge variant="outline" className={`text-xs ${getStatusColor(member.status)}`}>
+            <Badge
+              variant="outline"
+              className={`text-xs ${getStatusColor(member.status)}`}
+            >
               {member.status}
             </Badge>
           </div>
         </div>
       </div>
-      {isCurrentUser && (
-        <Badge className="mt-2 text-xs">You</Badge>
-      )}
+      {isCurrentUser && <Badge className="mt-2 text-xs">You</Badge>}
     </div>
   );
 };
@@ -89,21 +96,28 @@ interface FamilyTreeProps {
   onRelationshipChange?: () => void;
 }
 
-export default function FamilyTree({ currentMember, onRelationshipChange }: FamilyTreeProps) {
-  const [selectedMember, setSelectedMember] = useState<MemberWithRelationships | null>(null);
+export default function FamilyTree({
+  currentMember,
+  onRelationshipChange,
+}: FamilyTreeProps) {
+  const [selectedMember, setSelectedMember] =
+    useState<MemberWithRelationships | null>(null);
 
   // Fetch member details when clicked
-  const { data: selectedMemberDetails, isLoading: loadingMemberDetails } = useQuery({
-    queryKey: ['member-details', selectedMember?.id],
-    queryFn: async () => {
-      if (!selectedMember?.id || selectedMember.id === currentMember.id) {
-        return selectedMember;
-      }
-      const response = await apiClient.get<MemberWithRelationships>(`/members/${selectedMember.id}`);
-      return response;
-    },
-    enabled: !!selectedMember,
-  });
+  const { data: selectedMemberDetails, isLoading: loadingMemberDetails } =
+    useQuery({
+      queryKey: ["member-details", selectedMember?.id],
+      queryFn: async () => {
+        if (!selectedMember?.id || selectedMember.id === currentMember.id) {
+          return selectedMember;
+        }
+        const response = await apiClient.get<MemberWithRelationships>(
+          `/members/${selectedMember.id}`
+        );
+        return response;
+      },
+      enabled: !!selectedMember,
+    });
 
   const handleMemberClick = (member: MemberWithRelationships) => {
     setSelectedMember(member);
@@ -121,15 +135,15 @@ export default function FamilyTree({ currentMember, onRelationshipChange }: Fami
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 grid-cols-6  gap-6">
         {/* Family Tree Visualization */}
-        <div className="space-y-6">
+        <div className="col-span-4 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
+              {/* <CardTitle className="flex items-center space-x-2">
                 <Users className="h-5 w-5" />
                 <span>Family Tree</span>
-              </CardTitle>
+              </CardTitle> */}
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
@@ -141,7 +155,7 @@ export default function FamilyTree({ currentMember, onRelationshipChange }: Fami
                       Parents
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {currentMember.parents.map(parent => (
+                      {currentMember.parents.map((parent) => (
                         <TreeNode
                           key={parent.id}
                           member={parent as MemberWithRelationships}
@@ -172,10 +186,12 @@ export default function FamilyTree({ currentMember, onRelationshipChange }: Fami
                   <div>
                     <h3 className="text-lg font-semibold mb-3 flex items-center">
                       <span className="mr-2">💑</span>
-                      {currentMember.spouses.length === 1 ? 'Spouse' : 'Spouses'}
+                      {currentMember.spouses.length === 1
+                        ? "Spouse"
+                        : "Spouses"}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {currentMember.spouses.map(spouse => (
+                      {currentMember.spouses.map((spouse) => (
                         <TreeNode
                           key={spouse.id}
                           member={spouse as MemberWithRelationships}
@@ -187,56 +203,62 @@ export default function FamilyTree({ currentMember, onRelationshipChange }: Fami
                 )}
 
                 {/* Children Section */}
-                {currentMember.children && currentMember.children.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3 flex items-center">
-                      <span className="mr-2">👶</span>
-                      Children
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {currentMember.children.map(child => (
-                        <TreeNode
-                          key={child.id}
-                          member={child as MemberWithRelationships}
-                          onMemberClick={handleMemberClick}
-                        />
-                      ))}
+                {currentMember.children &&
+                  currentMember.children.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3 flex items-center">
+                        <span className="mr-2">👶</span>
+                        Children
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {currentMember.children.map((child) => (
+                          <TreeNode
+                            key={child.id}
+                            member={child as MemberWithRelationships}
+                            onMemberClick={handleMemberClick}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* No relationships message */}
-                {(!currentMember.parents || currentMember.parents.length === 0) &&
-                 (!currentMember.spouses || currentMember.spouses.length === 0) &&
-                 (!currentMember.children || currentMember.children.length === 0) && (
-                  <div className="text-center py-8 text-gray-500">
-                    <p className="text-lg mb-2">🌱</p>
-                    <p>No family relationships added yet.</p>
-                    <p className="text-sm">Start by adding family members to build your tree!</p>
-                  </div>
-                )}
+                {(!currentMember.parents ||
+                  currentMember.parents.length === 0) &&
+                  (!currentMember.spouses ||
+                    currentMember.spouses.length === 0) &&
+                  (!currentMember.children ||
+                    currentMember.children.length === 0) && (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-lg mb-2">🌱</p>
+                      <p>No family relationships added yet.</p>
+                      <p className="text-sm">
+                        Start by adding family members to build your tree!
+                      </p>
+                    </div>
+                  )}
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Relationship Manager */}
-        <div>
-          <Card>
+        <div className="col-span-2">
+          {/* <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Heart className="h-5 w-5" />
                 <span>Manage Relationships</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <RelationshipManager
-                currentMember={currentMember}
-                familyId={currentMember.familyMemberships[0]?.familyId}
-                onRelationshipChange={handleRelationshipChange}
-              />
-            </CardContent>
-          </Card>
+            <CardContent> */}
+          <RelationshipManager
+            currentMember={currentMember}
+            familyId={currentMember.familyMemberships[0]?.familyId}
+            onRelationshipChange={handleRelationshipChange}
+          />
+          {/* </CardContent>
+          </Card> */}
         </div>
       </div>
 
@@ -276,16 +298,27 @@ export default function FamilyTree({ currentMember, onRelationshipChange }: Fami
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-12 w-12">
                       <AvatarFallback>
-                        {displayedSelectedMember.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                        {displayedSelectedMember.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h3 className="text-lg font-semibold">{displayedSelectedMember.name}</h3>
+                      <h3 className="text-lg font-semibold">
+                        {displayedSelectedMember.name}
+                      </h3>
                       <div className="flex space-x-2">
                         {displayedSelectedMember.gender && (
-                          <Badge variant="outline">{displayedSelectedMember.gender}</Badge>
+                          <Badge variant="outline">
+                            {displayedSelectedMember.gender}
+                          </Badge>
                         )}
-                        <Badge variant="outline">{displayedSelectedMember.status}</Badge>
+                        <Badge variant="outline">
+                          {displayedSelectedMember.status}
+                        </Badge>
                       </div>
                     </div>
                   </div>
@@ -295,16 +328,30 @@ export default function FamilyTree({ currentMember, onRelationshipChange }: Fami
                       <h4 className="font-medium mb-2">Personal Information</h4>
                       <div className="text-sm text-gray-600 space-y-1">
                         {displayedSelectedMember.personalInfo.bio && (
-                          <p><strong>Bio:</strong> {displayedSelectedMember.personalInfo.bio}</p>
+                          <p>
+                            <strong>Bio:</strong>{" "}
+                            {displayedSelectedMember.personalInfo.bio}
+                          </p>
                         )}
                         {displayedSelectedMember.personalInfo.birthDate && (
-                          <p><strong>Birth Date:</strong> {new Date(displayedSelectedMember.personalInfo.birthDate).toLocaleDateString()}</p>
+                          <p>
+                            <strong>Birth Date:</strong>{" "}
+                            {new Date(
+                              displayedSelectedMember.personalInfo.birthDate
+                            ).toLocaleDateString()}
+                          </p>
                         )}
                         {displayedSelectedMember.personalInfo.birthPlace && (
-                          <p><strong>Birth Place:</strong> {displayedSelectedMember.personalInfo.birthPlace}</p>
+                          <p>
+                            <strong>Birth Place:</strong>{" "}
+                            {displayedSelectedMember.personalInfo.birthPlace}
+                          </p>
                         )}
                         {displayedSelectedMember.personalInfo.occupation && (
-                          <p><strong>Occupation:</strong> {displayedSelectedMember.personalInfo.occupation}</p>
+                          <p>
+                            <strong>Occupation:</strong>{" "}
+                            {displayedSelectedMember.personalInfo.occupation}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -312,45 +359,58 @@ export default function FamilyTree({ currentMember, onRelationshipChange }: Fami
 
                   {/* Show relationships if available */}
                   <div className="space-y-3">
-                    {displayedSelectedMember.parents && displayedSelectedMember.parents.length > 0 && (
-                      <div>
-                        <h4 className="font-medium mb-2">Parents</h4>
-                        <div className="text-sm text-gray-600">
-                          {displayedSelectedMember.parents.map(parent => parent.name).join(', ')}
+                    {displayedSelectedMember.parents &&
+                      displayedSelectedMember.parents.length > 0 && (
+                        <div>
+                          <h4 className="font-medium mb-2">Parents</h4>
+                          <div className="text-sm text-gray-600">
+                            {displayedSelectedMember.parents
+                              .map((parent) => parent.name)
+                              .join(", ")}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {displayedSelectedMember.spouses && displayedSelectedMember.spouses.length > 0 && (
-                      <div>
-                        <h4 className="font-medium mb-2">Spouses</h4>
-                        <div className="text-sm text-gray-600">
-                          {displayedSelectedMember.spouses.map(spouse => spouse.name).join(', ')}
+                    {displayedSelectedMember.spouses &&
+                      displayedSelectedMember.spouses.length > 0 && (
+                        <div>
+                          <h4 className="font-medium mb-2">Spouses</h4>
+                          <div className="text-sm text-gray-600">
+                            {displayedSelectedMember.spouses
+                              .map((spouse) => spouse.name)
+                              .join(", ")}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {displayedSelectedMember.children && displayedSelectedMember.children.length > 0 && (
-                      <div>
-                        <h4 className="font-medium mb-2">Children</h4>
-                        <div className="text-sm text-gray-600">
-                          {displayedSelectedMember.children.map(child => child.name).join(', ')}
+                    {displayedSelectedMember.children &&
+                      displayedSelectedMember.children.length > 0 && (
+                        <div>
+                          <h4 className="font-medium mb-2">Children</h4>
+                          <div className="text-sm text-gray-600">
+                            {displayedSelectedMember.children
+                              .map((child) => child.name)
+                              .join(", ")}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="font-medium">Created:</span>
                       <p className="text-gray-600">
-                        {new Date(displayedSelectedMember.createdAt).toLocaleDateString()}
+                        {new Date(
+                          displayedSelectedMember.createdAt
+                        ).toLocaleDateString()}
                       </p>
                     </div>
                     <div>
                       <span className="font-medium">Updated:</span>
                       <p className="text-gray-600">
-                        {new Date(displayedSelectedMember.updatedAt).toLocaleDateString()}
+                        {new Date(
+                          displayedSelectedMember.updatedAt
+                        ).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -359,7 +419,9 @@ export default function FamilyTree({ currentMember, onRelationshipChange }: Fami
                 <TabsContent value="relationships">
                   <RelationshipManager
                     currentMember={displayedSelectedMember}
-                    familyId={displayedSelectedMember.familyMemberships[0]?.familyId}
+                    familyId={
+                      displayedSelectedMember.familyMemberships[0]?.familyId
+                    }
                     onRelationshipChange={handleRelationshipChange}
                   />
                 </TabsContent>

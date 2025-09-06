@@ -1,34 +1,65 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { useCreateInvitation, useFamilies, useMyInvitations } from '@/hooks/api';
-import { createInvitationSchema, CreateInvitationFormData } from '@/schemas/family';
-import { ClipLoader } from 'react-spinners';
-import { Copy, Mail, Share2, ExternalLink } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { Invitation } from '@/types';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  CustomDialog,
+  CustomDialogContent,
+  CustomDialogDescription,
+  CustomDialogHeader,
+  CustomDialogTitle,
+  CustomDialogClose,
+} from "@/components/ui/custom-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  useCreateInvitation,
+  useFamilies,
+  useMyInvitations,
+} from "@/hooks/api";
+import {
+  createInvitationSchema,
+  CreateInvitationFormData,
+} from "@/schemas/family";
+import { ClipLoader } from "react-spinners";
+import { Copy, Mail, Share2, ExternalLink } from "lucide-react";
+import toast from "react-hot-toast";
+import { Invitation } from "@/types";
 
 interface InviteOthersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export default function InviteOthersDialog({ open, onOpenChange }: InviteOthersDialogProps) {
+export default function InviteOthersDialog({
+  open,
+  onOpenChange,
+}: InviteOthersDialogProps) {
   const { data: families = [] } = useFamilies();
-  const { data: myInvitations = [], refetch: refetchInvitations } = useMyInvitations();
+  const { data: myInvitations = [], refetch: refetchInvitations } =
+    useMyInvitations();
   const createInvitationMutation = useCreateInvitation();
-  const [generatedInvitation, setGeneratedInvitation] = useState<Invitation | null>(null);
+  const [generatedInvitation, setGeneratedInvitation] =
+    useState<Invitation | null>(null);
 
   const {
     register,
@@ -41,7 +72,7 @@ export default function InviteOthersDialog({ open, onOpenChange }: InviteOthersD
     resolver: zodResolver(createInvitationSchema),
   });
 
-  const selectedFamilyId = watch('familyId');
+  const selectedFamilyId = watch("familyId");
 
   const onSubmit = async (data: CreateInvitationFormData) => {
     try {
@@ -50,19 +81,21 @@ export default function InviteOthersDialog({ open, onOpenChange }: InviteOthersD
       refetchInvitations();
       reset();
     } catch (error) {
-      console.error('Failed to create invitation:', error);
+      console.error("Failed to create invitation:", error);
     }
   };
 
   const copyInvitationCode = (code: string) => {
     navigator.clipboard.writeText(code);
-    toast.success('Invitation code copied to clipboard!');
+    toast.success("Invitation code copied to clipboard!");
   };
 
   const copyInvitationLink = (code: string) => {
-    const link = `${window.location.origin}?invitation=${encodeURIComponent(code)}`;
+    const link = `${window.location.origin}?invitation=${encodeURIComponent(
+      code
+    )}`;
     navigator.clipboard.writeText(link);
-    toast.success('Invitation link copied to clipboard!');
+    toast.success("Invitation link copied to clipboard!");
   };
 
   const shareViaEmail = (code: string, familyName: string) => {
@@ -71,11 +104,17 @@ export default function InviteOthersDialog({ open, onOpenChange }: InviteOthersD
 
 Use this invitation code: ${code}
 
-Or click this link: ${window.location.origin}?invitation=${encodeURIComponent(code)}
+Or click this link: ${window.location.origin}?invitation=${encodeURIComponent(
+      code
+    )}
 
 Join us to explore and build our family history together!`;
 
-    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+    window.open(
+      `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(
+        body
+      )}`
+    );
   };
 
   const handleClose = () => {
@@ -86,26 +125,30 @@ Join us to explore and build our family history together!`;
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'VALID':
-        return 'default' as const;
-      case 'USED':
-        return 'secondary' as const;
-      case 'EXPIRED':
-        return 'destructive' as const;
+      case "VALID":
+        return "default" as const;
+      case "USED":
+        return "secondary" as const;
+      case "EXPIRED":
+        return "destructive" as const;
       default:
-        return 'outline' as const;
+        return "outline" as const;
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Invite Others to Join Your Family</DialogTitle>
-          <DialogDescription>
-            Create invitation codes to invite family members to join your family tree.
-          </DialogDescription>
-        </DialogHeader>
+    <CustomDialog open={open} onOpenChange={handleClose}>
+      <CustomDialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <CustomDialogHeader>
+          <CustomDialogTitle>
+            Invite Others to Join Your Family
+          </CustomDialogTitle>
+          <CustomDialogDescription>
+            Create invitation codes to invite family members to join your family
+            tree.
+          </CustomDialogDescription>
+          <CustomDialogClose onClick={handleClose} />
+        </CustomDialogHeader>
 
         <Tabs defaultValue="create" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -118,7 +161,9 @@ Join us to explore and build our family history together!`;
             {generatedInvitation ? (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-green-600">✅ Invitation Created!</CardTitle>
+                  <CardTitle className="text-green-600">
+                    ✅ Invitation Created!
+                  </CardTitle>
                   <CardDescription>
                     Share this invitation code or link with your family member.
                   </CardDescription>
@@ -136,7 +181,9 @@ Join us to explore and build our family history together!`;
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() => copyInvitationCode(generatedInvitation.code)}
+                        onClick={() =>
+                          copyInvitationCode(generatedInvitation.code)
+                        }
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -148,7 +195,9 @@ Join us to explore and build our family history together!`;
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => copyInvitationLink(generatedInvitation.code)}
+                      onClick={() =>
+                        copyInvitationLink(generatedInvitation.code)
+                      }
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
                       Copy Link
@@ -157,7 +206,12 @@ Join us to explore and build our family history together!`;
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => shareViaEmail(generatedInvitation.code, generatedInvitation.familyName)}
+                      onClick={() =>
+                        shareViaEmail(
+                          generatedInvitation.code,
+                          generatedInvitation.familyName
+                        )
+                      }
                     >
                       <Mail className="h-4 w-4 mr-2" />
                       Share via Email
@@ -171,7 +225,11 @@ Join us to explore and build our family history together!`;
                           navigator.share({
                             title: `Join ${generatedInvitation.familyName} family tree`,
                             text: `You've been invited to join our family tree!`,
-                            url: `${window.location.origin}?invitation=${encodeURIComponent(generatedInvitation.code)}`,
+                            url: `${
+                              window.location.origin
+                            }?invitation=${encodeURIComponent(
+                              generatedInvitation.code
+                            )}`,
                           });
                         } else {
                           copyInvitationLink(generatedInvitation.code);
@@ -184,8 +242,15 @@ Join us to explore and build our family history together!`;
                   </div>
 
                   <div className="text-sm text-gray-600">
-                    <p><strong>Family:</strong> {generatedInvitation.familyName}</p>
-                    <p><strong>Expires:</strong> {new Date(generatedInvitation.expiresAt).toLocaleDateString()}</p>
+                    <p>
+                      <strong>Family:</strong> {generatedInvitation.familyName}
+                    </p>
+                    <p>
+                      <strong>Expires:</strong>{" "}
+                      {new Date(
+                        generatedInvitation.expiresAt
+                      ).toLocaleDateString()}
+                    </p>
                   </div>
 
                   <Button
@@ -202,7 +267,9 @@ Join us to explore and build our family history together!`;
                 {/* Family Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="familyId">Family *</Label>
-                  <Select onValueChange={(value) => setValue('familyId', value)}>
+                  <Select
+                    onValueChange={(value) => setValue("familyId", value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a family to invite to" />
                     </SelectTrigger>
@@ -215,22 +282,27 @@ Join us to explore and build our family history together!`;
                     </SelectContent>
                   </Select>
                   {errors.familyId && (
-                    <p className="text-red-500 text-sm">{errors.familyId.message}</p>
+                    <p className="text-red-500 text-sm">
+                      {errors.familyId.message}
+                    </p>
                   )}
                 </div>
 
                 {/* Member Information */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Invited Member Information (Optional)</h3>
+                  <h3 className="text-lg font-medium">
+                    Invited Member Information (Optional)
+                  </h3>
                   <p className="text-sm text-gray-600">
-                    Provide information about the person you're inviting to help them get started.
+                    Provide information about the person you're inviting to help
+                    them get started.
                   </p>
 
                   <div className="space-y-2">
                     <Label htmlFor="memberName">Expected Name</Label>
                     <Input
                       id="memberName"
-                      {...register('memberStub.name')}
+                      {...register("memberStub.name")}
                       placeholder="e.g., John Smith"
                     />
                   </div>
@@ -239,7 +311,7 @@ Join us to explore and build our family history together!`;
                     <Label htmlFor="relationship">Relationship to You</Label>
                     <Input
                       id="relationship"
-                      {...register('memberStub.relationship')}
+                      {...register("memberStub.relationship")}
                       placeholder="e.g., Brother, Cousin, Uncle"
                     />
                   </div>
@@ -248,7 +320,7 @@ Join us to explore and build our family history together!`;
                     <Label htmlFor="note">Note for Invitee</Label>
                     <Textarea
                       id="note"
-                      {...register('memberStub.note')}
+                      {...register("memberStub.note")}
                       placeholder="Add a personal message or additional context"
                       rows={3}
                     />
@@ -267,7 +339,9 @@ Join us to explore and build our family history together!`;
                   </Button>
                   <Button
                     type="submit"
-                    disabled={createInvitationMutation.isPending || !selectedFamilyId}
+                    disabled={
+                      createInvitationMutation.isPending || !selectedFamilyId
+                    }
                   >
                     {createInvitationMutation.isPending ? (
                       <div className="flex items-center space-x-2">
@@ -275,7 +349,7 @@ Join us to explore and build our family history together!`;
                         <span>Creating...</span>
                       </div>
                     ) : (
-                      'Create Invitation'
+                      "Create Invitation"
                     )}
                   </Button>
                 </div>
@@ -290,7 +364,8 @@ Join us to explore and build our family history together!`;
 
               {myInvitations.length === 0 ? (
                 <p className="text-gray-500 text-center py-8">
-                  No invitations sent yet. Create your first invitation to get started!
+                  No invitations sent yet. Create your first invitation to get
+                  started!
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -300,28 +375,50 @@ Join us to explore and build our family history together!`;
                         <div className="flex items-start justify-between">
                           <div className="space-y-2 flex-1">
                             <div className="flex items-center space-x-2">
-                              <h4 className="font-medium">{invitation.familyName}</h4>
-                              <Badge variant={getStatusBadgeVariant(invitation.status)}>
+                              <h4 className="font-medium">
+                                {invitation.familyName}
+                              </h4>
+                              <Badge
+                                variant={getStatusBadgeVariant(
+                                  invitation.status
+                                )}
+                              >
                                 {invitation.status}
                               </Badge>
                             </div>
 
                             <div className="text-sm text-gray-600 space-y-1">
-                              <p><strong>Created:</strong> {new Date(invitation.createdAt).toLocaleDateString()}</p>
-                              <p><strong>Expires:</strong> {new Date(invitation.expiresAt).toLocaleDateString()}</p>
-                              {invitation.memberStub?.name && typeof invitation.memberStub.name === 'string' ? (
-                                <p><strong>For:</strong> {invitation.memberStub.name}</p>
+                              <p>
+                                <strong>Created:</strong>{" "}
+                                {new Date(
+                                  invitation.createdAt
+                                ).toLocaleDateString()}
+                              </p>
+                              <p>
+                                <strong>Expires:</strong>{" "}
+                                {new Date(
+                                  invitation.expiresAt
+                                ).toLocaleDateString()}
+                              </p>
+                              {invitation.memberStub?.name &&
+                              typeof invitation.memberStub.name === "string" ? (
+                                <p>
+                                  <strong>For:</strong>{" "}
+                                  {invitation.memberStub.name}
+                                </p>
                               ) : null}
                             </div>
                           </div>
 
-                          {invitation.status === 'VALID' && (
+                          {invitation.status === "VALID" && (
                             <div className="flex space-x-1">
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                onClick={() => copyInvitationCode(invitation.code)}
+                                onClick={() =>
+                                  copyInvitationCode(invitation.code)
+                                }
                               >
                                 <Copy className="h-4 w-4" />
                               </Button>
@@ -329,7 +426,12 @@ Join us to explore and build our family history together!`;
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                onClick={() => shareViaEmail(invitation.code, invitation.familyName)}
+                                onClick={() =>
+                                  shareViaEmail(
+                                    invitation.code,
+                                    invitation.familyName
+                                  )
+                                }
                               >
                                 <Mail className="h-4 w-4" />
                               </Button>
@@ -344,7 +446,7 @@ Join us to explore and build our family history together!`;
             </div>
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </CustomDialogContent>
+    </CustomDialog>
   );
 }

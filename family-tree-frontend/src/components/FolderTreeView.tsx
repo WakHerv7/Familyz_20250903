@@ -1,214 +1,201 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api';
-import { MemberWithRelationships, Gender, FamilyRole, MemberStatus } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight, Folder, FolderOpen, User, Users, Crown, Shield } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api";
+import { MemberWithRelationships } from "@/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Folder,
+  ChevronDown,
+  ChevronRight,
+  Users,
+  Plus,
+  UserPlus,
+  Heart,
+  User,
+  MoreVertical,
+  Eye,
+  Edit,
+  MoreHorizontal,
+  Download,
+  FileText,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import AddFamilyMemberDialog from "@/components/dialogs/AddFamilyMemberDialog";
+import ViewMemberDialog from "@/components/dialogs/ViewMemberDialog";
+import { CustomDialog } from "@/components/ui/custom-dialog";
 
-interface FolderTreeNode {
+interface TreeEntry {
+  column: number;
+  value: string;
+  memberIds: { id: string; name: string; gender: string }[];
+}
+
+interface TreeNode {
   id: string;
-  name: string;
-  type: 'family' | 'generation' | 'member';
-  level: number;
+  value: string;
+  column: number;
+  memberIds: { id: string; name: string; gender: string }[];
+  children: TreeNode[];
   expanded: boolean;
-  children: FolderTreeNode[];
-  member?: MemberWithRelationships;
-  familyId?: string;
-  generation?: number;
+  hasChildren: boolean;
 }
 
 interface FolderTreeViewProps {
   currentMember: MemberWithRelationships;
   isAdmin?: boolean;
-  onMemberClick?: (member: MemberWithRelationships) => void;
+  onMemberClick?: (memberId: string) => void;
 }
 
-export default function FolderTreeView({ currentMember, isAdmin = false, onMemberClick }: FolderTreeViewProps) {
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root']));
+export default function FolderTreeView({
+  currentMember,
+  isAdmin = false,
+  onMemberClick,
+}: FolderTreeViewProps) {
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [addRelationshipType, setAddRelationshipType] = useState<
+    "parent" | "spouse" | "child" | null
+  >(null);
+  const [selectedMemberForRelationship, setSelectedMemberForRelationship] =
+    useState<{
+      id: string;
+      name: string;
+    } | null>(null);
+  const [dropdownKey, setDropdownKey] = useState(0); // Force re-render key
 
-  // Fetch all family members if user is admin
-  const { data: allFamilyMembers = [] } = useQuery({
-    queryKey: ['all-family-members'],
+  // Fetch folder tree data with member IDs for the FolderTreeView
+  const { data: treeData = [], isLoading } = useQuery({
+    queryKey: ["folder-tree-data-with-ids"],
     queryFn: async () => {
-      if (!isAdmin) return [];
-      const response = await apiClient.get<MemberWithRelationships[]>('/members/all');
+      const response = await apiClient.get<TreeEntry[]>(
+        "/export/folder-tree-data-with-ids"
+      );
       return response;
     },
-    enabled: isAdmin,
   });
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  // Compute initial expanded nodes from treeData
+  const initialExpanded = useMemo(() => {
+    if (!treeData.length) return new Set<string>();
 
-  const getGenderIcon = (gender?: Gender) => {
-    switch (gender) {
-      case Gender.MALE:
-        return '👨';
-      case Gender.FEMALE:
-        return '👩';
-      default:
-        return '👤';
-    }
-  };
+    const computeExpandable = (
+      entries: TreeEntry[],
+      startIndex: number = 0
+    ): Set<string> => {
+      const result = new Set<string>();
+      let i = startIndex;
 
-  const getRoleIcon = (role?: FamilyRole) => {
-    switch (role) {
-      case FamilyRole.HEAD:
-        return <Crown className="h-3 w-3 text-yellow-600" />;
-      case FamilyRole.ADMIN:
-        return <Shield className="h-3 w-3 text-blue-600" />;
-      default:
-        return <User className="h-3 w-3 text-gray-500" />;
-    }
-  };
-
-  const buildFolderTree = (): FolderTreeNode[] => {
-    const membersToProcess = isAdmin ? allFamilyMembers : [currentMember, ...getFamilyMembers(currentMember)];
-
-    // Group by families
-    const familyGroups = new Map<string, MemberWithRelationships[]>();
-
-    membersToProcess.forEach(member => {
-      member.familyMemberships?.forEach(membership => {
-        if (!familyGroups.has(membership.familyId)) {
-          familyGroups.set(membership.familyId, []);
+      while (i < entries.length) {
+        const entry = entries[i];
+        const stableId = `${entry.column}-${entry.value.replace(
+          /[^a-zA-Z0-9]/g,
+          ""
+        )}-${i}`;
+        // Check if has children
+        const childrenStart = i + 1;
+        let childrenEnd = childrenStart;
+        while (
+          childrenEnd < entries.length &&
+          entries[childrenEnd].column > entry.column
+        ) {
+          childrenEnd++;
         }
-        familyGroups.get(membership.familyId)!.push(member);
-      });
-    });
-
-    const tree: FolderTreeNode[] = [];
-
-    familyGroups.forEach((members, familyId) => {
-      const familyName = members[0]?.familyMemberships?.find(m => m.familyId === familyId)?.familyName || 'Unknown Family';
-
-      // Create family node
-      const familyNode: FolderTreeNode = {
-        id: `family-${familyId}`,
-        name: familyName,
-        type: 'family',
-        level: 0,
-        expanded: expandedNodes.has(`family-${familyId}`),
-        children: [],
-        familyId,
-      };
-
-      // Group members by generation relative to current member
-      const generationGroups = new Map<number, MemberWithRelationships[]>();
-
-      members.forEach(member => {
-        const generation = calculateGeneration(member, currentMember);
-        if (!generationGroups.has(generation)) {
-          generationGroups.set(generation, []);
+        if (childrenEnd > childrenStart) {
+          result.add(stableId);
+          // Recursively add children's expandable IDs
+          const childExpandables = computeExpandable(
+            entries.slice(childrenStart, childrenEnd),
+            0
+          );
+          childExpandables.forEach((id) => result.add(id));
+          i = childrenEnd - 1; // Skip processed children
         }
-        generationGroups.get(generation)!.push(member);
-      });
-
-      // Sort generations
-      const sortedGenerations = Array.from(generationGroups.keys()).sort((a, b) => a - b);
-
-      sortedGenerations.forEach(gen => {
-        const genMembers = generationGroups.get(gen)!;
-        const genName = getGenerationName(gen);
-
-        const generationNode: FolderTreeNode = {
-          id: `generation-${familyId}-${gen}`,
-          name: `${genName} (${genMembers.length})`,
-          type: 'generation',
-          level: 1,
-          expanded: expandedNodes.has(`generation-${familyId}-${gen}`),
-          children: [],
-          generation: gen,
-        };
-
-        // Add members to generation
-        genMembers.forEach(member => {
-          const memberNode: FolderTreeNode = {
-            id: `member-${member.id}`,
-            name: member.name,
-            type: 'member',
-            level: 2,
-            expanded: false,
-            children: [],
-            member,
-          };
-          generationNode.children.push(memberNode);
-        });
-
-        familyNode.children.push(generationNode);
-      });
-
-      tree.push(familyNode);
-    });
-
-    return tree;
-  };
-
-  const getFamilyMembers = (member: MemberWithRelationships): MemberWithRelationships[] => {
-    const members: MemberWithRelationships[] = [];
-    const seen = new Set<string>([member.id]);
-
-    const addMembers = (memberList: any[]) => {
-      memberList?.forEach(m => {
-        if (!seen.has(m.id)) {
-          seen.add(m.id);
-          members.push(m);
-        }
-      });
+        i++;
+      }
+      return result;
     };
 
-    addMembers(member.parents || []);
-    addMembers(member.children || []);
-    addMembers(member.spouses || []);
+    return computeExpandable(treeData);
+  }, [treeData]);
 
-    return members;
-  };
+  // Set expanded nodes to initial expanded when treeData changes
+  useEffect(() => {
+    setExpandedNodes(initialExpanded);
+  }, [initialExpanded]);
 
-  const calculateGeneration = (member: MemberWithRelationships, reference: MemberWithRelationships): number => {
-    if (member.id === reference.id) return 0;
+  // Build hierarchical tree structure from flat data
+  const treeStructure = useMemo(() => {
+    if (!treeData.length) return [];
 
-    // Simple generation calculation based on relationships
-    if (reference.parents?.some(p => p.id === member.id)) return -1;
-    if (reference.children?.some(c => c.id === member.id)) return 1;
-    if (reference.spouses?.some(s => s.id === member.id)) return 0;
+    const buildTree = (
+      entries: TreeEntry[],
+      startIndex: number = 0,
+      parentPath: string = ""
+    ): TreeNode[] => {
+      const result: TreeNode[] = [];
+      let i = startIndex;
 
-    // Check for grandparents/grandchildren through parents
-    if (reference.parents?.some(parent =>
-      (parent as any).parents?.some((grandparent: any) => grandparent.id === member.id)
-    )) return -2;
+      while (i < entries.length) {
+        const entry = entries[i];
+        // Create stable ID based on content and position
+        const stableId = `${entry.column}-${entry.value.replace(
+          /[^a-zA-Z0-9]/g,
+          ""
+        )}-${i}`;
+        const node: TreeNode = {
+          id: stableId,
+          value: entry.value,
+          column: entry.column,
+          children: [],
+          memberIds: entry.memberIds,
+          expanded: expandedNodes.has(stableId),
+          hasChildren: false,
+        };
 
-    if (reference.children?.some(child =>
-      (child as any).children?.some((grandchild: any) => grandchild.id === member.id)
-    )) return 2;
+        // Check if next entries are children (higher column number)
+        const childrenStart = i + 1;
+        let childrenEnd = childrenStart;
 
-    return 0; // Default to same generation
-  };
+        while (
+          childrenEnd < entries.length &&
+          entries[childrenEnd].column > entry.column
+        ) {
+          childrenEnd++;
+        }
 
-  const getGenerationName = (generation: number): string => {
-    switch (generation) {
-      case -2: return 'Great Grandparents';
-      case -1: return 'Parents';
-      case 0: return 'Current Generation';
-      case 1: return 'Children';
-      case 2: return 'Grandchildren';
-      default:
-        if (generation < -2) return `Generation -${Math.abs(generation)}`;
-        if (generation > 2) return `Generation +${generation}`;
-        return 'Unknown Generation';
-    }
-  };
+        if (childrenEnd > childrenStart) {
+          node.children = buildTree(
+            entries.slice(childrenStart, childrenEnd),
+            0,
+            stableId
+          );
+          node.hasChildren = node.children.length > 0;
+          i = childrenEnd - 1; // Skip processed children
+        }
+
+        result.push(node);
+        i++;
+      }
+
+      return result;
+    };
+
+    console.log("treeData :: ", treeData);
+    console.log("expandedNodes :: ", expandedNodes);
+
+    return buildTree(treeData);
+  }, [treeData, expandedNodes]);
 
   const toggleNode = (nodeId: string) => {
     const newExpanded = new Set(expandedNodes);
@@ -220,127 +207,489 @@ export default function FolderTreeView({ currentMember, isAdmin = false, onMembe
     setExpandedNodes(newExpanded);
   };
 
-  const renderNode = (node: FolderTreeNode): React.ReactNode => {
-    const hasChildren = node.children.length > 0;
-    const isExpanded = expandedNodes.has(node.id);
-    const indentLevel = node.level * 20;
+  const toggleAllNodes = () => {
+    const allNodeIds = new Set<string>();
+    const collectNodeIds = (nodes: TreeNode[]) => {
+      nodes.forEach((node) => {
+        if (node.hasChildren) {
+          allNodeIds.add(node.id);
+        }
+        collectNodeIds(node.children);
+      });
+    };
+    collectNodeIds(treeStructure);
+
+    // Check if all nodes are currently expanded
+    const allExpanded = Array.from(allNodeIds).every((id) =>
+      expandedNodes.has(id)
+    );
+
+    if (allExpanded) {
+      // Collapse all
+      setExpandedNodes(new Set());
+    } else {
+      // Expand all
+      setExpandedNodes(allNodeIds);
+    }
+  };
+
+  const handleAddRelationship = (
+    relationshipType: "parent" | "spouse" | "child",
+    memberInfo: { id: string; name: string }
+  ) => {
+    setAddRelationshipType(relationshipType);
+    setSelectedMemberForRelationship(memberInfo);
+    setShowAddDialog(true);
+  };
+
+  const handleViewInfo = (node: TreeNode, memberName?: string) => {
+    // Find the corresponding tree entry to get the memberIds
+    const treeEntry = treeData.find((entry, index) => {
+      const stableId = `${entry.column}-${entry.value.replace(
+        /[^a-zA-Z0-9]/g,
+        ""
+      )}-${index}`;
+      return stableId === node.id;
+    });
+
+    const memberIds = node?.memberIds;
+    if (memberIds && memberIds.length > 0) {
+      let memberId: string;
+
+      if (memberName) {
+        // Find the member ID by name
+        const member = memberIds.find((m) => m.name === memberName);
+        if (member) {
+          memberId = member.id;
+        } else {
+          // Fallback to first member if name not found
+          memberId = memberIds[0].id;
+          console.warn(
+            `Member name "${memberName}" not found, using first member`
+          );
+        }
+      } else {
+        // No specific name provided, use first member
+        memberId = memberIds[0].id;
+      }
+
+      setSelectedMemberId(memberId);
+      setShowViewDialog(true);
+      console.log(
+        "View info for:",
+        memberName || node.value,
+        "ID:",
+        memberId,
+        "Total members:",
+        memberIds.length
+      );
+    } else {
+      console.error("No memberIds found for node:", node.value);
+    }
+  };
+
+  const handleEditInfo = (node: TreeNode) => {
+    // TODO: Implement edit info functionality
+    console.log("Edit info for:", node.value);
+  };
+
+  const handleExport = async (format: "pdf" | "excel") => {
+    try {
+      const exportRequest = {
+        format,
+        scope: "all-families",
+        config: {
+          formats: [format],
+          familyTree: {
+            structure: "textTree",
+            includeMembersList: true,
+            memberDetails: ["parent", "children", "spouses", "personalInfo"],
+          },
+        },
+        includeData: {
+          personalInfo: true,
+          relationships: true,
+          contactInfo: true,
+          profileImages: false,
+        },
+      };
+
+      const response = (await apiClient.post(
+        "/export/family-data",
+        exportRequest
+      )) as { downloadUrl: string; filename: string };
+
+      if (response.downloadUrl) {
+        // Open download in new tab
+        window.open(response.downloadUrl, "_blank");
+      }
+    } catch (error) {
+      console.error("Export failed:", error);
+      // You could add a toast notification here
+    }
+  };
+
+  const renderTreeNode = (node: TreeNode): React.ReactNode => {
+    const indentLevel = node.column * 20;
+    const isLeafNode = !node.hasChildren;
+
+    // Decompose node.value into alternating text segments and member names
+    const decomposeValue = (
+      value: string,
+      memberIds: { id: string; name: string; gender: string }[]
+    ) => {
+      if (!value) return [];
+
+      // Create a map of names to their genders
+      const nameToGender = new Map<string, string>();
+      memberIds?.forEach((member) => {
+        nameToGender.set(member.name, member.gender);
+      });
+
+      const result: (
+        | { type: "text"; content: string }
+        | { type: "name"; name: string; gender: string }
+      )[] = [];
+
+      let remainingText = value;
+      let lastEndIndex = 0;
+
+      // Find names in the order they appear in the text
+      while (remainingText.length > 0) {
+        let foundName = null;
+        let foundIndex = -1;
+
+        // Check each member name to see if it appears in the remaining text
+        for (const [name] of nameToGender) {
+          const nameIndex = remainingText.indexOf(name);
+          if (
+            nameIndex !== -1 &&
+            (foundIndex === -1 || nameIndex < foundIndex)
+          ) {
+            foundName = name;
+            foundIndex = nameIndex;
+          }
+        }
+
+        if (foundName && foundIndex !== -1) {
+          // Add text before the name (if any)
+          if (foundIndex > 0) {
+            const textBefore = remainingText.slice(0, foundIndex);
+            if (textBefore.trim()) {
+              result.push({ type: "text", content: textBefore });
+            }
+          }
+
+          // Add the name
+          const gender = nameToGender.get(foundName) || "UNKNOWN";
+          result.push({ type: "name", name: foundName, gender });
+
+          // Remove the processed part
+          remainingText = remainingText.slice(foundIndex + foundName.length);
+        } else {
+          // No more names found, add remaining text
+          if (remainingText.trim()) {
+            result.push({ type: "text", content: remainingText });
+          }
+          break;
+        }
+      }
+
+      return result;
+    };
+
+    const decomposedParts = decomposeValue(node.value, node.memberIds);
 
     return (
-      <div key={node.id} className="select-none">
+      <div key={node.id}>
         <div
-          className={cn(
-            "flex items-center py-1 px-2 hover:bg-gray-100 rounded cursor-pointer transition-colors",
-            node.type === 'member' && node.member?.id === currentMember.id && "bg-blue-50 border-l-2 border-blue-500"
-          )}
+          className="flex items-center py-1 px-2 hover:bg-gray-100 rounded transition-colors select-none"
           style={{ marginLeft: `${indentLevel}px` }}
-          onClick={() => {
-            if (hasChildren) {
-              toggleNode(node.id);
-            } else if (node.member) {
-              onMemberClick?.(node.member);
-            }
-          }}
         >
-          {/* Expand/Collapse Icon */}
-          <div className="w-4 h-4 mr-1 flex items-center justify-center">
-            {hasChildren ? (
-              isExpanded ? (
-                <ChevronDown className="h-3 w-3 text-gray-500" />
-              ) : (
-                <ChevronRight className="h-3 w-3 text-gray-500" />
-              )
+          {/* Expand/Collapse Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-6 h-6 p-0 mr-1"
+            onClick={() => node.hasChildren && toggleNode(node.id)}
+            disabled={!node.hasChildren}
+          >
+            {node.hasChildren ? (
+              <Badge
+                variant="outline"
+                className="mx-2 text-xs"
+                style={{
+                  backgroundColor: "#dcfedb77",
+                  borderColor: "#179922aa",
+                }}
+              >
+                {node.expanded ? (
+                  <ChevronDown className="h-3 w-3 text-green-600" />
+                ) : (
+                  <ChevronRight className="h-3 w-3 text-green-600" />
+                )}
+              </Badge>
             ) : null}
-          </div>
+          </Button>
 
           {/* Node Icon */}
-          <div className="w-4 h-4 mr-2 flex items-center justify-center">
-            {node.type === 'family' && (
-              isExpanded ? <FolderOpen className="h-4 w-4 text-blue-600" /> : <Folder className="h-4 w-4 text-blue-600" />
-            )}
-            {node.type === 'generation' && (
+          <div className="w-4 h-4 ml-3 mr-2 flex items-center justify-center">
+            {node.hasChildren ? (
               <Users className="h-4 w-4 text-green-600" />
-            )}
-            {node.type === 'member' && node.member && (
-              <Avatar className="h-4 w-4">
-                <AvatarFallback className="text-xs" style={{ fontSize: '8px' }}>
-                  {getInitials(node.member.name)}
-                </AvatarFallback>
-              </Avatar>
-            )}
-          </div>
-
-          {/* Node Content */}
-          <div className="flex-1 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">{node.name}</span>
-
-              {node.type === 'member' && node.member && (
-                <div className="flex items-center space-x-1">
-                  {getRoleIcon(node.member.familyMemberships?.[0]?.role)}
-                  <span className="text-xs">{getGenderIcon(node.member.gender)}</span>
-                  {node.member.status === MemberStatus.DECEASED && (
-                    <Badge variant="outline" className="text-xs">†</Badge>
-                  )}
-                  {node.member.id === currentMember.id && (
-                    <Badge variant="default" className="text-xs">You</Badge>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {node.type === 'family' && (
-              <Badge variant="outline" className="text-xs">
-                {node.children.reduce((count, gen) => count + gen.children.length, 0)} members
-              </Badge>
+            ) : node.value ? (
+              <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center">
+                <span className="text-xs text-blue-600">●</span>
+              </div>
+            ) : (
+              <></>
             )}
           </div>
+
+          {/* Render decomposed parts */}
+          {decomposedParts.map((part, index) => {
+            if (part.type === "text") {
+              return (
+                <span
+                  key={`text-${node.id}-${index}`}
+                  className="text-sm font-mono text-gray-600"
+                >
+                  {part.content}
+                </span>
+              );
+            } else {
+              // part.type === "name"
+              return (
+                <DropdownMenu key={`dropdown-${node.id}-${index}`}>
+                  <DropdownMenuTrigger asChild>
+                    <span
+                      className={`text-sm font-mono cursor-pointer transition-colors ${
+                        part.gender === "MALE"
+                          ? "hover:bg-blue-100 hover:text-blue-800"
+                          : part.gender === "FEMALE"
+                          ? "hover:bg-rose-100 hover:text-rose-800"
+                          : "hover:bg-gray-100"
+                      } px-2 py-1 rounded`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log("Dropdown trigger clicked for:", part.name);
+                      }}
+                    >
+                      {part.name}
+                    </span>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-48 z-50"
+                    sideOffset={4}
+                  >
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log("View info clicked for:", part.name);
+                        handleViewInfo(node, part.name);
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View infos
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log("Edit info clicked for:", part.name);
+                        handleEditInfo(node);
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit infos
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log("Add parent clicked for:", part.name);
+                        const member = node.memberIds.find(
+                          (m) => m.name === part.name
+                        );
+                        if (member) {
+                          handleAddRelationship("parent", {
+                            id: member.id,
+                            name: member.name,
+                          });
+                        }
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      Add a parent
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log("Add spouse clicked for:", part.name);
+                        const member = node.memberIds.find(
+                          (m) => m.name === part.name
+                        );
+                        if (member) {
+                          handleAddRelationship("spouse", {
+                            id: member.id,
+                            name: member.name,
+                          });
+                        }
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <Heart className="h-4 w-4 mr-2" />
+                      Add a spouse
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log("Add child clicked for:", part.name);
+                        const member = node.memberIds.find(
+                          (m) => m.name === part.name
+                        );
+                        if (member) {
+                          handleAddRelationship("child", {
+                            id: member.id,
+                            name: member.name,
+                          });
+                        }
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add a child
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            }
+          })}
         </div>
 
         {/* Render Children */}
-        {hasChildren && isExpanded && (
+        {node.hasChildren && node.expanded && (
           <div>
-            {node.children.map(child => renderNode(child))}
+            {node.children.map((child) => child.value && renderTreeNode(child))}
           </div>
         )}
       </div>
     );
   };
 
-  const tree = buildFolderTree();
-
   return (
-    <Card className="w-full">
+    <Card className="w-full" key={`tree-container-${dropdownKey}`}>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Folder className="h-5 w-5" />
-          <span>Family Tree Explorer</span>
-          {isAdmin && <Badge variant="outline">Admin View</Badge>}
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Folder className="text-green-600 h-5 w-5" />
+            <span>Family Tree Explorer</span>
+            {isAdmin && <Badge variant="outline">Admin View</Badge>}
+          </div>
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleAllNodes}
+              className="text-xs"
+            >
+              {(() => {
+                const allNodeIds = new Set<string>();
+                const collectNodeIds = (nodes: TreeNode[]) => {
+                  nodes.forEach((node) => {
+                    if (node.hasChildren) {
+                      allNodeIds.add(node.id);
+                    }
+                    collectNodeIds(node.children);
+                  });
+                };
+                collectNodeIds(treeStructure);
+                const allExpanded = Array.from(allNodeIds).every((id) =>
+                  expandedNodes.has(id)
+                );
+                return allExpanded ? "Collapse All" : "Expand All";
+              })()}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("pdf")}
+              className="text-xs hover:text-red-700 hover:bg-red-100"
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              Export PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("excel")}
+              className="text-xs hover:text-green-700 hover:bg-green-100"
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              Export Excel
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-1 max-h-96 overflow-y-auto">
-          {tree.length > 0 ? (
-            tree.map(node => renderNode(node))
+        <div className="space-y-1 max-h-[3000px] overflow-y-auto">
+          {isLoading ? (
+            <div className="text-center py-8 text-gray-500">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-2"></div>
+              <p>Loading family tree...</p>
+            </div>
+          ) : treeStructure.length > 0 ? (
+            treeStructure.map((node) => renderTreeNode(node))
           ) : (
             <div className="text-center py-8 text-gray-500">
               <Folder className="h-12 w-12 mx-auto mb-2 opacity-30" />
               <p>No family data available</p>
-              <p className="text-sm">Add family members to see the tree structure</p>
+              <p className="text-sm">
+                Add family members to see the tree structure
+              </p>
             </div>
           )}
         </div>
 
         <div className="mt-4 pt-4 border-t text-xs text-gray-500">
-          <p><strong>Legend:</strong></p>
+          <p>
+            <strong>Family Tree Structure:</strong>
+          </p>
           <div className="flex flex-wrap gap-4 mt-1">
-            <span className="flex items-center"><Folder className="h-3 w-3 mr-1" /> Family</span>
-            <span className="flex items-center"><Users className="h-3 w-3 mr-1" /> Generation</span>
-            <span className="flex items-center"><Crown className="h-3 w-3 mr-1" /> Head</span>
-            <span className="flex items-center"><Shield className="h-3 w-3 mr-1" /> Admin</span>
-            <span>† Deceased</span>
+            <span>Click expand buttons to show/hide branches</span>
+            <span>Action buttons appear for individual members</span>
+            <span>⚭ Marriage symbol</span>
+            <span>♂ Male / ♀ Female gender symbols</span>
+            <span>[Generation X] labels</span>
           </div>
         </div>
       </CardContent>
+
+      {/* Add Family Member Dialog - Always render to prevent dropdown state issues */}
+      <AddFamilyMemberDialog
+        open={showAddDialog}
+        onOpenChange={(open) => {
+          setShowAddDialog(open);
+          if (!open) {
+            setAddRelationshipType(null);
+            setSelectedMemberForRelationship(null);
+            // Force re-render of dropdown menus when dialog closes
+            // setDropdownKey((prev) => prev + 1);
+          }
+        }}
+        initialRelationship={{
+          type: addRelationshipType,
+          member: selectedMemberForRelationship,
+        }}
+      />
+
+      {/* View Member Dialog */}
+      <ViewMemberDialog
+        open={showViewDialog}
+        onOpenChange={setShowViewDialog}
+        memberId={selectedMemberId || undefined}
+      />
     </Card>
   );
 }

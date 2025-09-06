@@ -1,57 +1,57 @@
 // Enums
 export enum Gender {
-  MALE = 'MALE',
-  FEMALE = 'FEMALE',
-  OTHER = 'OTHER',
-  PREFER_NOT_TO_SAY = 'PREFER_NOT_TO_SAY',
+  MALE = "MALE",
+  FEMALE = "FEMALE",
+  OTHER = "OTHER",
+  PREFER_NOT_TO_SAY = "PREFER_NOT_TO_SAY",
 }
 
 export enum MemberStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-  DECEASED = 'DECEASED',
-  ARCHIVED = 'ARCHIVED',
+  ACTIVE = "ACTIVE",
+  INACTIVE = "INACTIVE",
+  DECEASED = "DECEASED",
+  ARCHIVED = "ARCHIVED",
 }
 
 export enum FamilyRole {
-  ADMIN = 'ADMIN',
-  MEMBER = 'MEMBER',
-  HEAD = 'HEAD',
-  VIEWER = 'VIEWER',
+  ADMIN = "ADMIN",
+  MEMBER = "MEMBER",
+  HEAD = "HEAD",
+  VIEWER = "VIEWER",
 }
 
 export enum RelationshipType {
-  PARENT = 'PARENT',
-  SPOUSE = 'SPOUSE',
-  CHILD = 'CHILD',
+  PARENT = "PARENT",
+  SPOUSE = "SPOUSE",
+  CHILD = "CHILD",
 }
 
 export enum RegistrationType {
-  CREATE_FAMILY = 'CREATE_FAMILY',
-  JOIN_FAMILY = 'JOIN_FAMILY',
+  CREATE_FAMILY = "CREATE_FAMILY",
+  JOIN_FAMILY = "JOIN_FAMILY",
 }
 
 // Social Feed Enums
 export enum PostVisibility {
-  PUBLIC = 'PUBLIC',
-  FAMILY = 'FAMILY',
-  SUBFAMILY = 'SUBFAMILY',
+  PUBLIC = "PUBLIC",
+  FAMILY = "FAMILY",
+  SUBFAMILY = "SUBFAMILY",
 }
 
 export enum NotificationType {
-  POST_LIKE = 'POST_LIKE',
-  COMMENT_LIKE = 'COMMENT_LIKE',
-  NEW_COMMENT = 'NEW_COMMENT',
-  NEW_POST = 'NEW_POST',
-  MENTION = 'MENTION',
+  POST_LIKE = "POST_LIKE",
+  COMMENT_LIKE = "COMMENT_LIKE",
+  NEW_COMMENT = "NEW_COMMENT",
+  NEW_POST = "NEW_POST",
+  MENTION = "MENTION",
 }
 
 // File Upload Types
 export enum FileType {
-  IMAGE = 'IMAGE',
-  DOCUMENT = 'DOCUMENT',
-  VIDEO = 'VIDEO',
-  AUDIO = 'AUDIO',
+  IMAGE = "IMAGE",
+  DOCUMENT = "DOCUMENT",
+  VIDEO = "VIDEO",
+  AUDIO = "AUDIO",
 }
 
 // User and Auth types
@@ -83,7 +83,7 @@ export interface RegisterRequest {
 }
 
 export interface LoginRequest {
-  emailOrPhone: string;
+  emailOrPhone: string; // Can be either email or phone number
   password: string;
 }
 
@@ -329,11 +329,17 @@ export interface NotificationQueryParams {
 
 // Enhanced Export Types
 export interface ExportConfig {
-  formats: ('pdf' | 'excel')[];
+  formats: ("pdf" | "excel")[];
   familyTree: {
-    structure: 'folderTree' | 'traditional' | 'interactive';
+    structure: "folderTree" | "traditional" | "interactive" | "textTree";
     includeMembersList: boolean;
-    memberDetails: ('parent' | 'children' | 'spouses' | 'personalInfo' | 'contact')[];
+    memberDetails: (
+      | "parent"
+      | "children"
+      | "spouses"
+      | "personalInfo"
+      | "contact"
+    )[];
   };
 }
 
@@ -358,8 +364,8 @@ export interface FolderTreeExportData {
 }
 
 export interface ExportRequest {
-  format: 'pdf' | 'excel';
-  scope: 'current-family' | 'all-families' | 'selected-families';
+  format: "pdf" | "excel";
+  scope: "current-family" | "all-families" | "selected-families";
   familyIds?: string[];
   config: ExportConfig;
   includeData: {
@@ -389,6 +395,6 @@ export interface TreeData {
   connections: {
     from: string;
     to: string;
-    type: 'parent' | 'spouse' | 'child';
+    type: "parent" | "spouse" | "child";
   }[];
 }
