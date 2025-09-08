@@ -24,6 +24,7 @@ const comment_module_1 = require("./comment/comment.module");
 const notification_module_1 = require("./notification/notification.module");
 const upload_module_1 = require("./upload/upload.module");
 const export_module_1 = require("./export/export.module");
+const import_module_1 = require("./import/import.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -32,11 +33,11 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             config_1.ConfigModule.forRoot({
                 isGlobal: true,
-                envFilePath: '.env',
+                envFilePath: ".env",
             }),
             throttler_1.ThrottlerModule.forRoot({
-                ttl: parseInt(process.env.THROTTLE_TTL || '60') * 1000,
-                limit: parseInt(process.env.THROTTLE_LIMIT || '20'),
+                ttl: parseInt(process.env.THROTTLE_TTL || "60") * 1000,
+                limit: parseInt(process.env.THROTTLE_LIMIT || "20"),
             }),
             prisma_module_1.PrismaModule,
             auth_module_1.AuthModule,
@@ -50,6 +51,7 @@ exports.AppModule = AppModule = __decorate([
             notification_module_1.NotificationModule,
             upload_module_1.UploadModule,
             export_module_1.ExportModule,
+            import_module_1.ImportModule,
         ],
         providers: [
             {
