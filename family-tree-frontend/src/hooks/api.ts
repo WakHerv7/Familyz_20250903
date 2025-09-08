@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api";
 import {
@@ -28,9 +29,8 @@ import { useAppDispatch, useAppSelector } from "./redux";
 import { loginSuccess, logout, setProfile } from "@/store/slices/authSlice";
 import toast from "react-hot-toast";
 
-// Auth hooks
+// Auth hooks (state-free approach)
 export const useLogin = () => {
-  const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -42,27 +42,27 @@ export const useLogin = () => {
       return response;
     },
     onSuccess: async (data: any) => {
-      // Store basic user data
-      dispatch(
-        loginSuccess({
-          user: data?.user,
-          accessToken: data?.accessToken,
-          refreshToken: data?.refreshToken,
-        })
-      );
-
-      // Fetch and store full profile data
-      try {
-        const profileResponse = await apiClient.get<MemberWithRelationships>(
-          "/members/profile"
-        );
-        dispatch(setProfile(profileResponse));
-      } catch (error) {
-        console.error("Failed to fetch profile after login:", error);
-        // Don't fail the login if profile fetch fails
+      // Store tokens in localStorage directly
+      if (data?.data?.accessToken && data?.data?.refreshToken) {
+        localStorage.setItem("accessToken", data.data.accessToken);
+        localStorage.setItem("refreshToken", data.data.refreshToken);
       }
 
+      // Invalidate queries to trigger fresh data fetching
+      queryClient.invalidateQueries();
+
       toast.success("Login successful!");
+
+      // Redirect to dashboard or saved URL
+      setTimeout(() => {
+        const savedUrl = localStorage.getItem("savedNavigationUrl");
+        if (savedUrl && savedUrl.startsWith("/")) {
+          localStorage.removeItem("savedNavigationUrl");
+          window.location.href = savedUrl;
+        } else {
+          window.location.href = "/dashboard";
+        }
+      }, 100);
     },
     onError: (error: Error) => {
       toast.error(error.message || "Login failed");
@@ -71,7 +71,7 @@ export const useLogin = () => {
 };
 
 export const useRegister = () => {
-  const dispatch = useAppDispatch();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: RegisterRequest) => {
@@ -82,27 +82,21 @@ export const useRegister = () => {
       return response;
     },
     onSuccess: async (data) => {
-      // Store basic user data
-      dispatch(
-        loginSuccess({
-          user: data.data.user,
-          accessToken: data.data.accessToken,
-          refreshToken: data.data.refreshToken,
-        })
-      );
-
-      // Fetch and store full profile data
-      try {
-        const profileResponse = await apiClient.get<MemberWithRelationships>(
-          "/members/profile"
-        );
-        dispatch(setProfile(profileResponse));
-      } catch (error) {
-        console.error("Failed to fetch profile after registration:", error);
-        // Don't fail the registration if profile fetch fails
+      // Store tokens in localStorage directly
+      if (data?.data?.accessToken && data?.data?.refreshToken) {
+        localStorage.setItem("accessToken", data.data.accessToken);
+        localStorage.setItem("refreshToken", data.data.refreshToken);
       }
 
+      // Invalidate queries to trigger fresh data fetching
+      queryClient.invalidateQueries();
+
       toast.success("Registration successful!");
+
+      // Redirect to dashboard
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 100);
     },
     onError: (error: Error) => {
       toast.error(error.message || "Registration failed");
@@ -111,17 +105,24 @@ export const useRegister = () => {
 };
 
 export const useLogout = () => {
-  const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
 
   return () => {
-    dispatch(logout());
+    // Clear tokens from localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("savedNavigationUrl");
+    }
+
+    // Clear all cached data
     queryClient.clear();
+
     toast.success("Logged out successfully");
 
     // Use Next.js router for client-side navigation
     if (typeof window !== "undefined") {
-      // Small delay to allow state updates to complete
+      // Small delay to allow cleanup to complete
       setTimeout(() => {
         window.location.href = "/";
       }, 100);
@@ -136,16 +137,15 @@ export const useUploadFile = () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await apiClient.post<FileUploadResponse>(
-        "/upload",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-      return response;
+      const response = await apiClient.post<Response>("/upload", formData);
+
+      // Extract JSON from Response object
+      if (response instanceof Response) {
+        const data = await response.json();
+        return data as FileUploadResponse;
+      }
+
+      return response as FileUploadResponse;
     },
     onSuccess: () => {
       toast.success("File uploaded successfully!");
@@ -164,16 +164,18 @@ export const useUploadProfileImage = () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await apiClient.post<FileUploadResponse>(
+      const response = await apiClient.post<Response>(
         "/upload/profile-image",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
+        formData
       );
-      return response;
+
+      // Extract JSON from Response object
+      if (response instanceof Response) {
+        const data = await response.json();
+        return data as FileUploadResponse;
+      }
+
+      return response as FileUploadResponse;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
@@ -199,9 +201,36 @@ export const useDeleteFile = () => {
   });
 };
 
-// Member hooks
+// Member hooks (state-free approach)
 export const useProfile = () => {
-  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (typeof window === "undefined") return;
+
+      const accessToken = localStorage.getItem("accessToken");
+      const refreshToken = localStorage.getItem("refreshToken");
+
+      if (!accessToken || !refreshToken) {
+        setIsAuthenticated(false);
+        return;
+      }
+
+      // Try to fetch profile to verify token validity
+      try {
+        await apiClient.get<MemberWithRelationships>("/members/profile");
+        setIsAuthenticated(true);
+      } catch (error) {
+        // Token is invalid, clear it
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   return useQuery({
     queryKey: ["profile"],
@@ -211,7 +240,7 @@ export const useProfile = () => {
       );
       return response;
     },
-    enabled: isAuthenticated,
+    enabled: isAuthenticated === true,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 };
@@ -222,58 +251,163 @@ export const useProfileFromStore = () => {
   return { profile, isAuthenticated };
 };
 
-// Hook for automatic redirection when profile is missing
+// Hook for automatic redirection when profile is missing (state-free approach)
 export const useAuthGuard = () => {
-  const { profile, isAuthenticated, loading } = useAppSelector(
-    (state) => state.auth
-  );
+  const [authStatus, setAuthStatus] = useState<{
+    isAuthenticated: boolean | null;
+    hasProfile: boolean;
+    profile: MemberWithRelationships | null;
+    isLoading: boolean;
+  }>({
+    isAuthenticated: null,
+    hasProfile: false,
+    profile: null,
+    isLoading: true,
+  });
 
-  // Only redirect if we're not in a loading state and definitely not authenticated
-  // This prevents redirecting during page refresh when auth is being initialized
-  if (typeof window !== "undefined" && !loading) {
-    if (!isAuthenticated || !profile) {
-      // Check if we're on a protected route (not auth routes)
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (typeof window === "undefined") return;
+
+      try {
+        // Check for tokens in localStorage
+        const accessToken = localStorage.getItem("accessToken");
+        const refreshToken = localStorage.getItem("refreshToken");
+
+        if (!accessToken || !refreshToken) {
+          setAuthStatus({
+            isAuthenticated: false,
+            hasProfile: false,
+            profile: null,
+            isLoading: false,
+          });
+          return;
+        }
+
+        // Try to fetch profile to verify token validity
+        try {
+          const response = await apiClient.get<MemberWithRelationships>(
+            "/members/profile"
+          );
+
+          setAuthStatus({
+            isAuthenticated: true,
+            hasProfile: true,
+            profile: response,
+            isLoading: false,
+          });
+        } catch (error) {
+          // Token is invalid, clear it
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+
+          setAuthStatus({
+            isAuthenticated: false,
+            hasProfile: false,
+            profile: null,
+            isLoading: false,
+          });
+        }
+      } catch (error) {
+        console.error("Auth check error:", error);
+        setAuthStatus({
+          isAuthenticated: false,
+          hasProfile: false,
+          profile: null,
+          isLoading: false,
+        });
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  // Handle redirection logic
+  useEffect(() => {
+    if (typeof window === "undefined" || authStatus.isLoading) return;
+
+    if (!authStatus.isAuthenticated) {
+      // Check if we're on a protected route
       const currentPath = window.location.pathname;
       const isOnProtectedRoute =
         !currentPath.startsWith("/login") &&
         !currentPath.startsWith("/signup") &&
         currentPath !== "/";
 
-      // Only redirect if we're on a protected route and definitely not authenticated
-      if (isOnProtectedRoute && !isAuthenticated) {
-        // Small delay to prevent immediate redirect during state transitions
-        setTimeout(() => {
-          if (window.location.pathname !== "/") {
+      // Only redirect if we're on a protected route
+      if (isOnProtectedRoute) {
+        // Check if there's a saved navigation URL
+        const savedUrl = localStorage.getItem("savedNavigationUrl");
+        if (!savedUrl || savedUrl === "/" || savedUrl === currentPath) {
+          // Use Next.js router for client-side navigation
+          setTimeout(() => {
             window.location.href = "/";
-          }
-        }, 100);
+          }, 100);
+        }
       }
     }
-  }
+  }, [authStatus.isAuthenticated, authStatus.isLoading]);
 
-  return { profile, isAuthenticated, hasProfile: !!profile };
+  return {
+    profile: authStatus.profile,
+    isAuthenticated: authStatus.isAuthenticated,
+    hasProfile: authStatus.hasProfile,
+    loading: authStatus.isLoading,
+  };
 };
 
 export const useUpdateProfile = () => {
-  const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: UpdateMemberRequest) => {
+    mutationFn: async (data: FormData | UpdateMemberRequest) => {
+      console.log("[API Hook] useUpdateProfile - Mutation started", {
+        dataType: data instanceof FormData ? "FormData" : "JSON",
+        hasFile: data instanceof FormData,
+      });
+
+      // If it's FormData, use the API client with FormData support
+      if (data instanceof FormData) {
+        console.log("[API Hook] useUpdateProfile - Sending FormData request");
+        const response = await apiClient.put<MemberWithRelationships>(
+          "/members/profile",
+          data,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+        console.log("[API Hook] useUpdateProfile - FormData request completed");
+        return response;
+      }
+
+      // Otherwise, use regular JSON request
+      console.log("[API Hook] useUpdateProfile - Sending JSON request");
       const response = await apiClient.put<MemberWithRelationships>(
         "/members/profile",
         data
       );
+      console.log("[API Hook] useUpdateProfile - JSON request completed");
       return response;
     },
     onSuccess: (updatedProfile) => {
-      // Update Redux store with the new profile data
-      dispatch(setProfile(updatedProfile));
+      console.log("[API Hook] useUpdateProfile - Mutation successful", {
+        hasUpdatedProfile: !!updatedProfile,
+      });
+      // Invalidate profile queries to trigger fresh data fetching
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast.success("Profile updated successfully!");
     },
     onError: (error: Error) => {
+      console.error("[API Hook] useUpdateProfile - Mutation failed:", error);
       toast.error(error.message || "Failed to update profile");
+    },
+    onMutate: () => {
+      console.log("[API Hook] useUpdateProfile - Mutation initiated");
+    },
+    onSettled: () => {
+      console.log("[API Hook] useUpdateProfile - Mutation settled");
     },
   });
 };
@@ -318,6 +452,30 @@ export const useAddRelationship = () => {
   });
 };
 
+export const useAddRelationshipToMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      memberId,
+      data,
+    }: {
+      memberId: string;
+      data: AddRelationshipRequest;
+    }) => {
+      await apiClient.post(`/members/${memberId}/relationships`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["member-details"] });
+      toast.success("Relationship added successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to add relationship");
+    },
+  });
+};
+
 export const useRemoveRelationship = () => {
   const queryClient = useQueryClient();
 
@@ -336,8 +494,59 @@ export const useRemoveRelationship = () => {
   });
 };
 
+export const useRemoveRelationshipToMember = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      memberId,
+      data,
+    }: {
+      memberId: string;
+      data: AddRelationshipRequest;
+    }) => {
+      await apiClient.delete(`/members/${memberId}/relationships`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["member-details"] });
+      toast.success("Relationship removed successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to add relationship");
+    },
+  });
+};
+
 export const useFamilyMembers = (familyId: string) => {
-  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (typeof window === "undefined") return;
+
+      const accessToken = localStorage.getItem("accessToken");
+      const refreshToken = localStorage.getItem("refreshToken");
+
+      if (!accessToken || !refreshToken) {
+        setIsAuthenticated(false);
+        return;
+      }
+
+      // Try to fetch profile to verify token validity
+      try {
+        await apiClient.get<MemberWithRelationships>("/members/profile");
+        setIsAuthenticated(true);
+      } catch (error) {
+        // Token is invalid, clear it
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   return useQuery({
     queryKey: ["family-members", familyId],
@@ -347,7 +556,7 @@ export const useFamilyMembers = (familyId: string) => {
       );
       return response;
     },
-    enabled: isAuthenticated && !!familyId,
+    enabled: isAuthenticated === true && !!familyId,
   });
 };
 
@@ -365,20 +574,141 @@ export const useFamilies = () => {
   });
 };
 
+export const useFamily = (familyId: string) => {
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+
+  return useQuery({
+    queryKey: ["family", familyId],
+    queryFn: async () => {
+      const response = await apiClient.get<Family>(`/families/${familyId}`);
+      return response;
+    },
+    enabled: isAuthenticated && !!familyId,
+  });
+};
+
 export const useCreateFamily = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string }) => {
+    mutationFn: async (data: {
+      name: string;
+      description?: string;
+      isSubFamily?: boolean;
+      parentFamilyId?: string;
+      addCreatorAsMember?: boolean;
+    }) => {
       const response = await apiClient.post<Family>("/families", data);
       return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["families"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast.success("Family created successfully!");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to create family");
+    },
+  });
+};
+
+export const useAddMemberToFamily = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      familyId,
+      memberId,
+      role,
+    }: {
+      familyId: string;
+      memberId: string;
+      role: "MEMBER" | "HEAD" | "ADMIN";
+    }) => {
+      const response = await apiClient.post(`/families/${familyId}/members`, {
+        memberId,
+        role,
+      });
+      return response;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+      queryClient.invalidateQueries({
+        queryKey: ["family-members", variables.familyId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Member added to family successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to add member to family");
+    },
+  });
+};
+
+export const useRemoveMemberFromFamily = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      familyId,
+      memberId,
+    }: {
+      familyId: string;
+      memberId: string;
+    }) => {
+      const response = await apiClient.delete(
+        `/families/${familyId}/members/${memberId}`
+      );
+      return response;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+      queryClient.invalidateQueries({
+        queryKey: ["family-members", variables.familyId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Member removed from family successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to remove member from family");
+    },
+  });
+};
+
+export const useSoftDeleteFamily = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (familyId: string) => {
+      const response = await apiClient.delete(`/families/${familyId}`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Family deleted successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to delete family");
+    },
+  });
+};
+
+export const useRestoreFamily = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (familyId: string) => {
+      const response = await apiClient.post(`/families/${familyId}/restore`);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Family restored successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to restore family");
     },
   });
 };
@@ -709,7 +1039,9 @@ export const useNotifications = (params?: NotificationQueryParams) => {
       return response;
     },
     enabled: isAuthenticated,
-    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+    refetchInterval: 120000, // Refetch every 2 minutes instead of 30 seconds
+    refetchIntervalInBackground: false, // Don't refetch when tab is not active
+    staleTime: 60000, // Consider data fresh for 1 minute
   });
 };
 
@@ -725,9 +1057,9 @@ export const useUnreadNotificationCount = () => {
       return response;
     },
     enabled: isAuthenticated,
-    refetchInterval: 120000, // Refetch every 2 minutes to avoid rate limiting
+    refetchInterval: 300000, // Refetch every 5 minutes instead of 2 minutes
     refetchIntervalInBackground: false, // Don't refetch when tab is not active
-    staleTime: 30000, // Consider data fresh for 30 seconds
+    staleTime: 60000, // Consider data fresh for 1 minute
     retry: (failureCount, error: any) => {
       // Don't retry on 429 errors to avoid making it worse
       if (error?.status === 429) {

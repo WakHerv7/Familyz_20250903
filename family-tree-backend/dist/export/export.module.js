@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const export_controller_1 = require("./export.controller");
 const export_service_1 = require("./export.service");
 const prisma_module_1 = require("../prisma/prisma.module");
+const treeData_service_1 = require("../common/services/treeData.service");
 let ExportModule = class ExportModule {
 };
 exports.ExportModule = ExportModule;
@@ -18,8 +19,8 @@ exports.ExportModule = ExportModule = __decorate([
     (0, common_1.Module)({
         imports: [prisma_module_1.PrismaModule],
         controllers: [export_controller_1.ExportController],
-        providers: [export_service_1.ExportService],
-        exports: [export_service_1.ExportService],
+        providers: [export_service_1.ExportService, treeData_service_1.TreeDataService],
+        exports: [export_service_1.ExportService, treeData_service_1.TreeDataService],
     })
 ], ExportModule);
 //# sourceMappingURL=export.module.js.map

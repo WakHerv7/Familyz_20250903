@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { join } from "path";
+import * as express from "express";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
@@ -38,6 +39,10 @@ async function bootstrap() {
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   });
+
+  // Configure body parser limits for file uploads
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // Static file serving for uploads
   app.useStaticAssets(join(__dirname, "..", "uploads"), {

@@ -1,7 +1,15 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsUUID, IsEnum, IsArray, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
-import { FamilyRole as PrismaFamilyRole } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsUUID,
+  IsEnum,
+  IsArray,
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { FamilyRole as PrismaFamilyRole } from "@prisma/client";
 
 export { PrismaFamilyRole as FamilyRole };
 
@@ -30,6 +38,11 @@ export class CreateFamilyDto {
   @IsOptional()
   @IsUUID()
   headOfFamilyId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  addCreatorAsMember?: boolean;
 }
 
 // Update Family DTO

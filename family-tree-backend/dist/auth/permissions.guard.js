@@ -29,7 +29,7 @@ let PermissionsGuard = class PermissionsGuard {
         if (!user || !user.memberId) {
             throw new common_1.ForbiddenException("User not authenticated");
         }
-        const familyId = this.extractFamilyId(request, context);
+        const familyId = await this.extractFamilyId(request, context);
         if (!familyId) {
             throw new common_1.ForbiddenException("Family ID not found in request");
         }
@@ -39,10 +39,13 @@ let PermissionsGuard = class PermissionsGuard {
         }
         return true;
     }
-    extractFamilyId(request, context) {
+    async extractFamilyId(request, context) {
         const params = context.switchToHttp().getRequest().params;
-        if (params.familyId || params.id) {
-            return params.familyId || params.id;
+        if (params.id && this.isMemberOperation(context)) {
+            return this.getFamilyIdFromMember(params.id, request.user.memberId);
+        }
+        if (params.familyId) {
+            return params.familyId;
         }
         const body = context.switchToHttp().getRequest().body;
         if (body && body.familyId) {
@@ -53,6 +56,42 @@ let PermissionsGuard = class PermissionsGuard {
             return query.familyId;
         }
         return null;
+    }
+    isMemberOperation(context) {
+        const request = context.switchToHttp().getRequest();
+        const path = request.route?.path || request.url;
+        return path.includes("/members/") && !path.includes("/members/family/");
+    }
+    async getFamilyIdFromMember(memberId, userMemberId) {
+        try {
+            const targetMembership = await this.prisma.familyMembership.findFirst({
+                where: {
+                    memberId: memberId,
+                    isActive: true,
+                },
+                select: {
+                    familyId: true,
+                },
+            });
+            if (!targetMembership) {
+                return null;
+            }
+            const userMembership = await this.prisma.familyMembership.findFirst({
+                where: {
+                    memberId: userMemberId,
+                    familyId: targetMembership.familyId,
+                    isActive: true,
+                },
+                select: {
+                    familyId: true,
+                },
+            });
+            return userMembership ? targetMembership.familyId : null;
+        }
+        catch (error) {
+            console.error("Error getting family ID from member:", error);
+            return null;
+        }
     }
     async checkPermissions(memberId, familyId, requiredPermissions) {
         try {

@@ -9,10 +9,10 @@ interface AuthGuardProps {
 }
 
 export default function AuthGuard({ children, fallback }: AuthGuardProps) {
-  const { profile, isAuthenticated, hasProfile } = useAuthGuard();
+  const { profile, isAuthenticated, hasProfile, loading } = useAuthGuard();
 
   // Show loading while checking authentication
-  if (isAuthenticated === null || (isAuthenticated && !hasProfile)) {
+  if (loading || (isAuthenticated && !hasProfile)) {
     return (
       fallback || (
         <div className="min-h-screen flex items-center justify-center">

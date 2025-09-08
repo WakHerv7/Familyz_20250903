@@ -1,15 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAppSelector } from "@/hooks/redux";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import RegisterForm from "@/components/auth/RegisterForm";
-import { ClipLoader } from "react-spinners";
 
 export default function SignupPage() {
-  const { isAuthenticated, loading } = useAppSelector((state) => state.auth);
-  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
 
   // Update document title based on current step
@@ -26,34 +21,6 @@ export default function SignupPage() {
   const handleStepChange = (step: number) => {
     setCurrentStep(step);
   };
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push("/dashboard");
-    }
-  }, [isAuthenticated, router]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
-        <div className="text-center">
-          <ClipLoader size={48} color="#059669" />
-          <p className="mt-4 text-gray-600">Loading Family Tree Platform...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
-        <div className="text-center">
-          <ClipLoader size={32} color="#059669" />
-          <p className="mt-4 text-gray-600">Redirecting to dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center p-4">

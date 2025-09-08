@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRegister } from "@/hooks/api";
+import { useRegister } from "@/hooks/useAuth";
 import { registerSchema, RegisterFormData } from "@/schemas/auth";
 import { Gender, RegistrationType } from "@/types";
 import { ClipLoader } from "react-spinners";

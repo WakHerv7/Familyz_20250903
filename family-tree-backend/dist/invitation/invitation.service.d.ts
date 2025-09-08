@@ -22,6 +22,7 @@ export declare class InvitationService {
             createdAt: Date;
             updatedAt: Date;
             isSubFamily: boolean;
+            deletedAt: Date | null;
             creatorId: string;
             headOfFamilyId: string | null;
             parentFamilyId: string | null;
@@ -46,6 +47,8 @@ export declare class InvitationService {
             createdAt: Date;
             status: import(".prisma/client").$Enums.MemberStatus;
             updatedAt: Date;
+            color: string | null;
+            parentColors: string[];
         };
     } & {
         id: string;

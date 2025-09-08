@@ -1,4 +1,4 @@
-import { FamilyRole as PrismaFamilyRole } from '@prisma/client';
+import { FamilyRole as PrismaFamilyRole } from "@prisma/client";
 export { PrismaFamilyRole as FamilyRole };
 export declare class CreateFamilyDto {
     name: string;
@@ -6,6 +6,7 @@ export declare class CreateFamilyDto {
     isSubFamily?: boolean;
     parentFamilyId?: string;
     headOfFamilyId?: string;
+    addCreatorAsMember?: boolean;
 }
 export declare class UpdateFamilyDto {
     name?: string;

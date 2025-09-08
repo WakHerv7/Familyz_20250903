@@ -1,15 +1,31 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsObject, IsEnum, IsUUID, IsArray, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
-import { Gender as PrismaGender, MemberStatus as PrismaMemberStatus, FamilyRole as PrismaFamilyRole } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsString,
+  IsOptional,
+  IsObject,
+  IsEnum,
+  IsUUID,
+  IsArray,
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
+import {
+  Gender as PrismaGender,
+  MemberStatus as PrismaMemberStatus,
+  FamilyRole as PrismaFamilyRole,
+} from "@prisma/client";
 
 // Use Prisma enums directly
-export { PrismaGender as Gender, PrismaMemberStatus as MemberStatus, PrismaFamilyRole as FamilyRole };
+export {
+  PrismaGender as Gender,
+  PrismaMemberStatus as MemberStatus,
+  PrismaFamilyRole as FamilyRole,
+};
 
 export enum RelationshipType {
-  PARENT = 'PARENT',
-  SPOUSE = 'SPOUSE',
-  CHILD = 'CHILD',
+  PARENT = "PARENT",
+  SPOUSE = "SPOUSE",
+  CHILD = "CHILD",
 }
 
 // Update Member Profile DTO
@@ -44,6 +60,10 @@ export class AddRelationshipDto {
   @ApiProperty({ enum: RelationshipType })
   @IsEnum(RelationshipType)
   relationshipType: RelationshipType;
+
+  @ApiProperty()
+  @IsUUID()
+  familyId: string;
 }
 
 // Remove Relationship DTO
@@ -55,6 +75,10 @@ export class RemoveRelationshipDto {
   @ApiProperty({ enum: RelationshipType })
   @IsEnum(RelationshipType)
   relationshipType: RelationshipType;
+
+  @ApiProperty()
+  @IsUUID()
+  familyId: string;
 }
 
 // Bulk Relationship DTO

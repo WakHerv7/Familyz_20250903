@@ -357,66 +357,68 @@ export default function NotificationPanel({
       </div>
 
       {/* Tabbed Interface */}
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mx-6 mb-4 bg-gray-100">
-          <TabsTrigger value="all" className="flex items-center space-x-2">
-            <span>All</span>
-            {notifications.length > 0 && (
-              <Badge variant="secondary" className="text-xs">
-                {notifications.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="unread" className="flex items-center space-x-2">
-            <span>Unread</span>
-            {unreadCount > 0 && (
-              <Badge variant="destructive" className="text-xs">
-                {unreadCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
+      <div className="relative flex justify-center">
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="grid w-full grid-cols-2  mb-4 bg-gray-100">
+            <TabsTrigger value="all" className="flex items-center space-x-2">
+              <span>All</span>
+              {notifications.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {notifications.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="unread" className="flex items-center space-x-2">
+              <span>Unread</span>
+              {unreadCount > 0 && (
+                <Badge variant="destructive" className="text-xs">
+                  {unreadCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="all" className="px-6 pb-6">
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <ClipLoader size={32} color="#3B82F6" />
-              </div>
-            ) : notifications.length > 0 ? (
-              notifications.map((notification) =>
-                renderNotificationCard(notification)
-              )
-            ) : (
-              renderEmptyState(
-                "No notifications yet",
-                "When your family members interact with posts, you'll see activity here.",
-                <Bell className="h-8 w-8 text-gray-400" />
-              )
-            )}
-          </div>
-        </TabsContent>
+          <TabsContent value="all" className="px-6 pb-6">
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <ClipLoader size={32} color="#3B82F6" />
+                </div>
+              ) : notifications.length > 0 ? (
+                notifications.map((notification) =>
+                  renderNotificationCard(notification)
+                )
+              ) : (
+                renderEmptyState(
+                  "No notifications yet",
+                  "When your family members interact with posts, you'll see activity here.",
+                  <Bell className="h-8 w-8 text-gray-400" />
+                )
+              )}
+            </div>
+          </TabsContent>
 
-        <TabsContent value="unread" className="px-6 pb-6">
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <ClipLoader size={32} color="#3B82F6" />
-              </div>
-            ) : notifications.filter((n) => !n.isRead).length > 0 ? (
-              notifications
-                .filter((notification) => !notification.isRead)
-                .map((notification) => renderNotificationCard(notification))
-            ) : (
-              renderEmptyState(
-                "All caught up! 🎉",
-                "You've read all your notifications. New activity will appear here.",
-                <CheckCheck className="h-8 w-8 text-green-500" />
-              )
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="unread" className="px-6 pb-6">
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <ClipLoader size={32} color="#3B82F6" />
+                </div>
+              ) : notifications.filter((n) => !n.isRead).length > 0 ? (
+                notifications
+                  .filter((notification) => !notification.isRead)
+                  .map((notification) => renderNotificationCard(notification))
+              ) : (
+                renderEmptyState(
+                  "All caught up! 🎉",
+                  "You've read all your notifications. New activity will appear here.",
+                  <CheckCheck className="h-8 w-8 text-green-500" />
+                )
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

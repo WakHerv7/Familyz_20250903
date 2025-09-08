@@ -15,16 +15,19 @@ const client_1 = require("@prisma/client");
 let PrismaService = class PrismaService extends client_1.PrismaClient {
     constructor() {
         super({
-            log: ['query', 'info', 'warn', 'error'],
+            log: [
+                "warn",
+                "error",
+            ],
         });
     }
     async onModuleInit() {
         await this.$connect();
-        console.log('🔌 Connected to PostgreSQL database');
+        console.log("🔌 Connected to PostgreSQL database");
     }
     async onModuleDestroy() {
         await this.$disconnect();
-        console.log('🔌 Disconnected from PostgreSQL database');
+        console.log("🔌 Disconnected from PostgreSQL database");
     }
     async transaction(fn) {
         return this.$transaction(fn);

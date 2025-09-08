@@ -11,10 +11,34 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // Don't redirect if user is not authenticated or if we're still loading
+    if (!isAuthenticated || loading) {
+      return;
+    }
+
+    // Check if there's a saved navigation URL
+    const savedUrl = localStorage.getItem("savedNavigationUrl");
+
+    // If there's a valid saved URL that's different from current page, let the navigation persistence logic handle it
+    if (
+      savedUrl &&
+      savedUrl !== "/" &&
+      savedUrl !== window.location.pathname &&
+      savedUrl.startsWith("/")
+    ) {
+      // Don't redirect here - let the navigation persistence logic handle it
+      return;
+    }
+
+    // Only redirect to dashboard if there's no saved URL or it's invalid
+    if (
+      !savedUrl ||
+      savedUrl === "/" ||
+      savedUrl === window.location.pathname
+    ) {
       router.push("/dashboard");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, loading, router]);
 
   if (loading) {
     return (

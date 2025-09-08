@@ -2,13 +2,9 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  useProfile,
-  useUpdateProfile,
-  useUploadProfileImage,
-} from "@/hooks/api";
+import { useProfile, useUpdateProfile } from "@/hooks/api";
 import { updateProfileSchema, UpdateProfileFormData } from "@/schemas/member";
-import { Gender, MemberStatus, UploadedFile } from "@/types";
+import { Gender, MemberStatus } from "@/types";
 import {
   CustomDialog,
   CustomDialogContent,
@@ -29,10 +25,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import ImageUpload from "@/components/ImageUpload";
 import { ClipLoader } from "react-spinners";
 import { User, Camera } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import toast from "react-hot-toast";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -45,10 +41,9 @@ export default function SettingsDialog({
 }: SettingsDialogProps) {
   const { data: profile, isLoading } = useProfile();
   const updateProfileMutation = useUpdateProfile();
-  const uploadProfileImageMutation = useUploadProfileImage();
-  const [profileImageFiles, setProfileImageFiles] = useState<UploadedFile[]>(
-    []
-  );
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -83,21 +78,9 @@ export default function SettingsDialog({
         },
       });
 
-      // Set profile image if exists
+      // Set current profile image preview
       if (profile.personalInfo?.profileImage) {
-        setProfileImageFiles([
-          {
-            id: profile.personalInfo.profileImageId || "current",
-            filename: "profile-image",
-            originalName: "Profile Image",
-            mimeType: "image/jpeg",
-            size: 0,
-            url: profile.personalInfo.profileImage,
-            type: "IMAGE" as any,
-            uploadedBy: profile.id,
-            uploadedAt: new Date(),
-          },
-        ]);
+        setPreviewUrl(profile.personalInfo.profileImage);
       }
     }
   }, [profile, open, reset]);
@@ -111,67 +94,169 @@ export default function SettingsDialog({
       .slice(0, 2);
   };
 
-  const handleProfileImageUploaded = (file: UploadedFile) => {
-    setProfileImageFiles([file]);
-    // Update the profile with the new image
-    if (profile) {
-      updateProfileMutation.mutate({
-        personalInfo: {
-          ...profile.personalInfo,
-          profileImage: file.url,
-          profileImageId: file.id,
-        },
-      });
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    console.log("[Settings Dialog] File selection event triggered", {
+      hasFile: !!file,
+      fileName: file?.name,
+      fileSize: file?.size,
+      fileType: file?.type,
+    });
+
+    if (file) {
+      // Validate file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        console.error("[Settings Dialog] File size validation failed", {
+          fileSize: file.size,
+          maxSize: 10 * 1024 * 1024,
+        });
+        toast.error("File size must be less than 10MB");
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+      ];
+      if (!allowedTypes.includes(file.type)) {
+        console.error("[Settings Dialog] File type validation failed", {
+          fileType: file.type,
+          allowedTypes,
+        });
+        toast.error(
+          "Please select a valid image file (JPEG, PNG, GIF, or WebP)"
+        );
+        return;
+      }
+
+      console.log(
+        "[Settings Dialog] File validation passed, setting selected file"
+      );
+      setSelectedFile(file);
+
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        console.log("[Settings Dialog] Preview URL generated successfully");
+        setPreviewUrl(e.target?.result as string);
+      };
+      reader.onerror = (error) => {
+        console.error("[Settings Dialog] Error generating preview URL:", error);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      console.log("[Settings Dialog] No file selected");
     }
   };
 
-  const handleProfileImageRemoved = (fileId: string) => {
-    setProfileImageFiles([]);
-    // Update the profile to remove the image
-    if (profile) {
-      updateProfileMutation.mutate({
-        personalInfo: {
-          ...profile.personalInfo,
-          profileImage: undefined,
-          profileImageId: undefined,
-        },
-      });
+  const handleFileRemove = () => {
+    setSelectedFile(null);
+    setPreviewUrl(profile?.personalInfo?.profileImage || null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
   const onSubmit = async (data: UpdateProfileFormData) => {
+    console.log("[Settings Dialog] Form submission started", {
+      hasName: !!data.name,
+      hasGender: !!data.gender,
+      hasStatus: !!data.status,
+      hasPersonalInfo: !!data.personalInfo,
+      hasFile: !!selectedFile,
+      fileName: selectedFile?.name,
+      fileSize: selectedFile?.size,
+    });
+
     try {
-      // Clean up social links - remove empty strings
-      const cleanedSocialLinks = data.personalInfo?.socialLinks
-        ? {
-            facebook: data.personalInfo.socialLinks.facebook || undefined,
-            twitter: data.personalInfo.socialLinks.twitter || undefined,
-            linkedin: data.personalInfo.socialLinks.linkedin || undefined,
-            instagram: data.personalInfo.socialLinks.instagram || undefined,
-          }
-        : undefined;
+      console.log("[Settings Dialog] Creating FormData");
+      const formData = new FormData();
 
-      // Prepare updated personal info
-      const updatedPersonalInfo = data.personalInfo
-        ? {
-            ...data.personalInfo,
-            socialLinks: cleanedSocialLinks,
-            // Preserve existing profile image data
-            profileImage: profile?.personalInfo?.profileImage,
-            profileImageId: profile?.personalInfo?.profileImageId,
-          }
-        : undefined;
+      // Add form data
+      formData.append("name", data.name || "");
+      if (data.gender) formData.append("gender", data.gender);
+      if (data.status) formData.append("status", data.status);
 
-      await updateProfileMutation.mutateAsync({
-        name: data.name,
-        gender: data.gender,
-        status: data.status,
-        personalInfo: updatedPersonalInfo,
-      });
+      // Add personal info
+      if (data.personalInfo) {
+        console.log("[Settings Dialog] Adding personal info to FormData");
+        if (data.personalInfo.bio)
+          formData.append("personalInfo[bio]", data.personalInfo.bio);
+        if (data.personalInfo.birthDate)
+          formData.append(
+            "personalInfo[birthDate]",
+            data.personalInfo.birthDate
+          );
+        if (data.personalInfo.birthPlace)
+          formData.append(
+            "personalInfo[birthPlace]",
+            data.personalInfo.birthPlace
+          );
+        if (data.personalInfo.occupation)
+          formData.append(
+            "personalInfo[occupation]",
+            data.personalInfo.occupation
+          );
+        if (data.personalInfo.phoneNumber)
+          formData.append(
+            "personalInfo[phoneNumber]",
+            data.personalInfo.phoneNumber
+          );
+        if (data.personalInfo.email)
+          formData.append("personalInfo[email]", data.personalInfo.email);
 
-      onOpenChange(false);
+        // Add social links
+        if (data.personalInfo.socialLinks) {
+          console.log("[Settings Dialog] Adding social links to FormData");
+          if (data.personalInfo.socialLinks.facebook)
+            formData.append(
+              "personalInfo[socialLinks][facebook]",
+              data.personalInfo.socialLinks.facebook
+            );
+          if (data.personalInfo.socialLinks.twitter)
+            formData.append(
+              "personalInfo[socialLinks][twitter]",
+              data.personalInfo.socialLinks.twitter
+            );
+          if (data.personalInfo.socialLinks.linkedin)
+            formData.append(
+              "personalInfo[socialLinks][linkedin]",
+              data.personalInfo.socialLinks.linkedin
+            );
+          if (data.personalInfo.socialLinks.instagram)
+            formData.append(
+              "personalInfo[socialLinks][instagram]",
+              data.personalInfo.socialLinks.instagram
+            );
+        }
+      }
+
+      // Add file if selected
+      if (selectedFile) {
+        console.log("[Settings Dialog] Adding file to FormData");
+        formData.append("profileImage", selectedFile);
+      }
+
+      console.log("[Settings Dialog] Calling API mutation");
+      await updateProfileMutation.mutateAsync(formData);
+
+      console.log("[Settings Dialog] Profile update successful");
+      // Show success notification
+      toast.success("Profile updated successfully!");
+
+      // Reset form state
+      setSelectedFile(null);
+
+      // Close dialog after a brief delay to show the success message
+      setTimeout(() => {
+        onOpenChange(false);
+      }, 1500);
     } catch (error) {
-      console.error("Failed to update profile:", error);
+      console.error("[Settings Dialog] Profile update failed:", error);
+      toast.error("Failed to update profile. Please try again.");
     }
   };
 
@@ -189,7 +274,7 @@ export default function SettingsDialog({
 
   return (
     <CustomDialog open={open} onOpenChange={onOpenChange}>
-      <CustomDialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <CustomDialogContent className="sm:max-w-[900px] lg:max-w-[1000px] max-h-[95vh] overflow-y-auto">
         <CustomDialogHeader>
           <CustomDialogTitle className="flex items-center space-x-2">
             <User className="h-5 w-5" />
@@ -213,9 +298,9 @@ export default function SettingsDialog({
               {/* Current Profile Display */}
               <div className="flex flex-col items-center space-y-2">
                 <Avatar className="h-20 w-20">
-                  {profileImageFiles.length > 0 ? (
+                  {previewUrl ? (
                     <img
-                      src={profileImageFiles[0].url}
+                      src={previewUrl}
                       alt="Profile"
                       className="w-full h-full object-cover"
                     />
@@ -225,25 +310,41 @@ export default function SettingsDialog({
                     </AvatarFallback>
                   )}
                 </Avatar>
-                <span className="text-sm text-gray-600">Current Photo</span>
+                <span className="text-sm text-gray-600">
+                  {selectedFile ? "New Photo Selected" : "Current Photo"}
+                </span>
               </div>
 
-              {/* Image Upload */}
-              <div className="flex-1">
-                <ImageUpload
-                  onFileUploaded={handleProfileImageUploaded}
-                  onFileRemoved={handleProfileImageRemoved}
-                  existingFiles={profileImageFiles}
-                  maxFiles={1}
-                  maxSizeMB={5}
-                  acceptedTypes={[
-                    "image/jpeg",
-                    "image/png",
-                    "image/gif",
-                    "image/webp",
-                  ]}
-                  variant="profile"
-                />
+              {/* File Input */}
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center space-x-3">
+                  <Input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    onChange={handleFileChange}
+                    className="flex-1"
+                  />
+                  {selectedFile && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleFileRemove}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Select a new profile photo (JPEG, PNG, GIF, or WebP, max 10MB)
+                </p>
+                {selectedFile && (
+                  <p className="text-sm text-green-600">
+                    Selected: {selectedFile.name} (
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -439,20 +540,11 @@ export default function SettingsDialog({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={
-                updateProfileMutation.isPending ||
-                uploadProfileImageMutation.isPending
-              }
+              disabled={updateProfileMutation.isPending}
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={
-                updateProfileMutation.isPending ||
-                uploadProfileImageMutation.isPending
-              }
-            >
+            <Button type="submit" disabled={updateProfileMutation.isPending}>
               {updateProfileMutation.isPending ? (
                 <div className="flex items-center space-x-2">
                   <ClipLoader size={16} color="white" />

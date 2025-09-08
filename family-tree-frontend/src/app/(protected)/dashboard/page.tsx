@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAppSelector } from "@/hooks/redux";
 import { useProfileFromStore, useUnreadNotificationCount } from "@/hooks/api";
 import { MemberWithRelationships } from "@/types";
@@ -38,6 +39,7 @@ import {
 } from "lucide-react";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { user } = useAppSelector((state) => state.auth);
   const { profile } = useProfileFromStore();
   const { data: unreadCount } = useUnreadNotificationCount();
@@ -55,6 +57,10 @@ export default function DashboardPage() {
   const handleRelationshipChange = () => {
     // Refetch profile to update relationships
     // refetchProfile();
+  };
+
+  const handleFamilyClick = (familyId: string) => {
+    router.push(`/families/${familyId}/members`);
   };
 
   return (
@@ -294,37 +300,48 @@ export default function DashboardPage() {
                       {profile.familyMemberships.map((membership) => (
                         <div
                           key={membership.id}
-                          className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                          className="p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 cursor-pointer group"
+                          onClick={() => handleFamilyClick(membership.familyId)}
                         >
                           <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-semibold text-lg">
-                                {membership.familyName}
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                Role:{" "}
-                                <span className="font-medium">
-                                  {membership.role}
-                                </span>
-                              </p>
-                              <p className="text-sm text-gray-500">
-                                Joined:{" "}
-                                {new Date(
-                                  membership.joinDate
-                                ).toLocaleDateString()}
-                              </p>
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                                  <Users className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-lg text-gray-900 group-hover:text-blue-700 transition-colors">
+                                    {membership.familyName}
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    Role:{" "}
+                                    <span className="font-medium">
+                                      {membership.role}
+                                    </span>
+                                  </p>
+                                  <p className="text-sm text-gray-500">
+                                    Joined:{" "}
+                                    {new Date(
+                                      membership.joinDate
+                                    ).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
-                            <Badge
-                              variant={
-                                membership.role === "ADMIN" ||
-                                membership.role === "HEAD"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                              className="ml-4"
-                            >
-                              {membership.role}
-                            </Badge>
+                            <div className="flex items-center space-x-3">
+                              <Badge
+                                variant={
+                                  membership.role === "ADMIN" ||
+                                  membership.role === "HEAD"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                                className="ml-4"
+                              >
+                                {membership.role}
+                              </Badge>
+                              <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                            </div>
                           </div>
                         </div>
                       ))}

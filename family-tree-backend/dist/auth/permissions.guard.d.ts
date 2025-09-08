@@ -7,5 +7,7 @@ export declare class PermissionsGuard implements CanActivate {
     constructor(reflector: Reflector, prisma: PrismaService);
     canActivate(context: ExecutionContext): Promise<boolean>;
     private extractFamilyId;
+    private isMemberOperation;
+    private getFamilyIdFromMember;
     private checkPermissions;
 }

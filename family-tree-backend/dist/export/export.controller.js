@@ -17,9 +17,11 @@ const common_1 = require("@nestjs/common");
 const path = require("path");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const export_service_1 = require("./export.service");
+const treeData_service_1 = require("../common/services/treeData.service");
 let ExportController = class ExportController {
-    constructor(exportService) {
+    constructor(exportService, treeeDataService) {
         this.exportService = exportService;
+        this.treeeDataService = treeeDataService;
     }
     async getFolderTreeData(req) {
         return await this.exportService.getFolderTreeData(req.user.memberId);
@@ -27,8 +29,14 @@ let ExportController = class ExportController {
     async getExplorerTreeData(req) {
         return await this.exportService.getExplorerTreeData(req.user.memberId);
     }
-    async getFolderTreeDataWithIds(req) {
-        return await this.exportService.getFolderTreeDataWithIds(req.user.memberId);
+    async getFolderTreeDataWithIds(req, params, familyId) {
+        return await this.exportService.getFolderTreeDataWithIds(req.user.memberId, familyId);
+    }
+    async getFamilyFolderTreeData(req, familyId) {
+        if (!familyId) {
+            throw new common_1.BadRequestException("familyId is required");
+        }
+        return await this.treeeDataService.getFamilyFolderTreeData(familyId);
     }
     async downloadFile(filename, res) {
         try {
@@ -91,10 +99,21 @@ __decorate([
     (0, common_1.Get)("folder-tree-data-with-ids"),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Param)()),
+    __param(2, (0, common_1.Query)("familyId")),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object, String]),
     __metadata("design:returntype", Promise)
 ], ExportController.prototype, "getFolderTreeDataWithIds", null);
+__decorate([
+    (0, common_1.Get)("family-folder-tree-data"),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Query)("familyId")),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], ExportController.prototype, "getFamilyFolderTreeData", null);
 __decorate([
     (0, common_1.Get)("download/:filename"),
     __param(0, (0, common_1.Param)("filename")),
@@ -114,6 +133,7 @@ __decorate([
 ], ExportController.prototype, "exportFamilyData", null);
 exports.ExportController = ExportController = __decorate([
     (0, common_1.Controller)("export"),
-    __metadata("design:paramtypes", [export_service_1.ExportService])
+    __metadata("design:paramtypes", [export_service_1.ExportService,
+        treeData_service_1.TreeDataService])
 ], ExportController);
 //# sourceMappingURL=export.controller.js.map

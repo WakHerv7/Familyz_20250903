@@ -9,6 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  CustomDialog,
+  CustomDialogContent,
+  CustomDialogDescription,
+  CustomDialogHeader,
+  CustomDialogTitle,
+  CustomDialogClose,
+} from "@/components/ui/custom-dialog";
 import RelationshipManager from "@/components/RelationshipManager";
 import { Users, Heart, UserCheck } from "lucide-react";
 
@@ -262,28 +270,28 @@ export default function FamilyTree({
         </div>
       </div>
 
-      {/* Member Details Modal/Card */}
-      {selectedMember && selectedMember.id !== currentMember.id && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <UserCheck className="h-5 w-5" />
-                <span>Family Member Details</span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedMember(null)}
-                disabled={loadingMemberDetails}
-              >
-                Close
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* Member Details Modal */}
+      <CustomDialog
+        open={!!selectedMember && selectedMember.id !== currentMember.id}
+        onOpenChange={(open) => {
+          if (!open) setSelectedMember(null);
+        }}
+      >
+        <CustomDialogContent className="sm:max-w-[800px] lg:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <CustomDialogHeader>
+            <CustomDialogTitle className="flex items-center space-x-2">
+              <UserCheck className="h-5 w-5" />
+              <span>Family Member Details</span>
+            </CustomDialogTitle>
+            <CustomDialogDescription>
+              View member information and manage relationships
+            </CustomDialogDescription>
+            <CustomDialogClose onClick={() => setSelectedMember(null)} />
+          </CustomDialogHeader>
+
+          <div className="space-y-6">
             {loadingMemberDetails ? (
-              <div className="text-center py-4">
+              <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                 <p className="mt-2 text-gray-500">Loading member details...</p>
               </div>
@@ -296,8 +304,8 @@ export default function FamilyTree({
 
                 <TabsContent value="details" className="space-y-4">
                   <div className="flex items-center space-x-3">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback>
+                    <Avatar className="h-16 w-16">
+                      <AvatarFallback className="text-lg">
                         {displayedSelectedMember.name
                           .split(" ")
                           .map((n) => n[0])
@@ -307,10 +315,10 @@ export default function FamilyTree({
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h3 className="text-lg font-semibold">
+                      <h3 className="text-xl font-semibold">
                         {displayedSelectedMember.name}
                       </h3>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-2 mt-1">
                         {displayedSelectedMember.gender && (
                           <Badge variant="outline">
                             {displayedSelectedMember.gender}
@@ -324,18 +332,22 @@ export default function FamilyTree({
                   </div>
 
                   {displayedSelectedMember.personalInfo && (
-                    <div>
-                      <h4 className="font-medium mb-2">Personal Information</h4>
-                      <div className="text-sm text-gray-600 space-y-1">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-3 text-gray-900">
+                        Personal Information
+                      </h4>
+                      <div className="text-sm text-gray-600 space-y-2">
                         {displayedSelectedMember.personalInfo.bio && (
                           <p>
-                            <strong>Bio:</strong>{" "}
+                            <strong className="text-gray-800">Bio:</strong>{" "}
                             {displayedSelectedMember.personalInfo.bio}
                           </p>
                         )}
                         {displayedSelectedMember.personalInfo.birthDate && (
                           <p>
-                            <strong>Birth Date:</strong>{" "}
+                            <strong className="text-gray-800">
+                              Birth Date:
+                            </strong>{" "}
                             {new Date(
                               displayedSelectedMember.personalInfo.birthDate
                             ).toLocaleDateString()}
@@ -343,14 +355,30 @@ export default function FamilyTree({
                         )}
                         {displayedSelectedMember.personalInfo.birthPlace && (
                           <p>
-                            <strong>Birth Place:</strong>{" "}
+                            <strong className="text-gray-800">
+                              Birth Place:
+                            </strong>{" "}
                             {displayedSelectedMember.personalInfo.birthPlace}
                           </p>
                         )}
                         {displayedSelectedMember.personalInfo.occupation && (
                           <p>
-                            <strong>Occupation:</strong>{" "}
+                            <strong className="text-gray-800">
+                              Occupation:
+                            </strong>{" "}
                             {displayedSelectedMember.personalInfo.occupation}
+                          </p>
+                        )}
+                        {displayedSelectedMember.personalInfo.phoneNumber && (
+                          <p>
+                            <strong className="text-gray-800">Phone:</strong>{" "}
+                            {displayedSelectedMember.personalInfo.phoneNumber}
+                          </p>
+                        )}
+                        {displayedSelectedMember.personalInfo.email && (
+                          <p>
+                            <strong className="text-gray-800">Email:</strong>{" "}
+                            {displayedSelectedMember.personalInfo.email}
                           </p>
                         )}
                       </div>
@@ -358,12 +386,14 @@ export default function FamilyTree({
                   )}
 
                   {/* Show relationships if available */}
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {displayedSelectedMember.parents &&
                       displayedSelectedMember.parents.length > 0 && (
-                        <div>
-                          <h4 className="font-medium mb-2">Parents</h4>
-                          <div className="text-sm text-gray-600">
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <h4 className="font-medium mb-2 text-blue-900">
+                            👨‍👩‍👧‍👦 Parents
+                          </h4>
+                          <div className="text-sm text-blue-800">
                             {displayedSelectedMember.parents
                               .map((parent) => parent.name)
                               .join(", ")}
@@ -373,9 +403,11 @@ export default function FamilyTree({
 
                     {displayedSelectedMember.spouses &&
                       displayedSelectedMember.spouses.length > 0 && (
-                        <div>
-                          <h4 className="font-medium mb-2">Spouses</h4>
-                          <div className="text-sm text-gray-600">
+                        <div className="bg-pink-50 p-3 rounded-lg">
+                          <h4 className="font-medium mb-2 text-pink-900">
+                            💑 Spouses
+                          </h4>
+                          <div className="text-sm text-pink-800">
                             {displayedSelectedMember.spouses
                               .map((spouse) => spouse.name)
                               .join(", ")}
@@ -385,9 +417,11 @@ export default function FamilyTree({
 
                     {displayedSelectedMember.children &&
                       displayedSelectedMember.children.length > 0 && (
-                        <div>
-                          <h4 className="font-medium mb-2">Children</h4>
-                          <div className="text-sm text-gray-600">
+                        <div className="bg-green-50 p-3 rounded-lg">
+                          <h4 className="font-medium mb-2 text-green-900">
+                            👶 Children
+                          </h4>
+                          <div className="text-sm text-green-800">
                             {displayedSelectedMember.children
                               .map((child) => child.name)
                               .join(", ")}
@@ -396,18 +430,22 @@ export default function FamilyTree({
                       )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-3 rounded-lg">
                     <div>
-                      <span className="font-medium">Created:</span>
-                      <p className="text-gray-600">
+                      <span className="font-medium text-gray-800">
+                        Created:
+                      </span>
+                      <p className="text-gray-600 mt-1">
                         {new Date(
                           displayedSelectedMember.createdAt
                         ).toLocaleDateString()}
                       </p>
                     </div>
                     <div>
-                      <span className="font-medium">Updated:</span>
-                      <p className="text-gray-600">
+                      <span className="font-medium text-gray-800">
+                        Updated:
+                      </span>
+                      <p className="text-gray-600 mt-1">
                         {new Date(
                           displayedSelectedMember.updatedAt
                         ).toLocaleDateString()}
@@ -416,7 +454,17 @@ export default function FamilyTree({
                   </div>
                 </TabsContent>
 
-                <TabsContent value="relationships">
+                <TabsContent value="relationships" className="space-y-4">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">
+                      Add New Relationship
+                    </h4>
+                    <p className="text-sm text-blue-700 mb-4">
+                      Connect {displayedSelectedMember.name} with other family
+                      members
+                    </p>
+                  </div>
+
                   <RelationshipManager
                     currentMember={displayedSelectedMember}
                     familyId={
@@ -427,11 +475,13 @@ export default function FamilyTree({
                 </TabsContent>
               </Tabs>
             ) : (
-              <p className="text-gray-500">Failed to load member details.</p>
+              <div className="text-center py-8">
+                <p className="text-gray-500">Failed to load member details.</p>
+              </div>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CustomDialogContent>
+      </CustomDialog>
     </div>
   );
 }

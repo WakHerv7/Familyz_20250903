@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { ExportService } from "./export.service";
+import { TreeDataService } from "@/common/services/treeData.service";
 interface AuthenticatedRequest extends Request {
     user: {
         sub: string;
@@ -47,13 +48,23 @@ interface FolderTreeExportData {
 }
 export declare class ExportController {
     private exportService;
-    constructor(exportService: ExportService);
+    private treeeDataService;
+    constructor(exportService: ExportService, treeeDataService: TreeDataService);
     getFolderTreeData(req: AuthenticatedRequest): Promise<FolderTreeExportData>;
     getExplorerTreeData(req: AuthenticatedRequest): Promise<{
         column: number;
         value: string;
     }[]>;
-    getFolderTreeDataWithIds(req: AuthenticatedRequest): Promise<{
+    getFolderTreeDataWithIds(req: AuthenticatedRequest, params: any, familyId?: string): Promise<{
+        column: number;
+        value: string;
+        memberIds: {
+            id: string;
+            name: string;
+            gender: string;
+        }[];
+    }[]>;
+    getFamilyFolderTreeData(req: AuthenticatedRequest, familyId: string): Promise<{
         column: number;
         value: string;
         memberIds: {

@@ -1,5 +1,5 @@
-import { Gender as PrismaGender, MemberStatus as PrismaMemberStatus, FamilyRole as PrismaFamilyRole } from '@prisma/client';
-export { PrismaGender as Gender, PrismaMemberStatus as MemberStatus, PrismaFamilyRole as FamilyRole };
+import { Gender as PrismaGender, MemberStatus as PrismaMemberStatus, FamilyRole as PrismaFamilyRole } from "@prisma/client";
+export { PrismaGender as Gender, PrismaMemberStatus as MemberStatus, PrismaFamilyRole as FamilyRole, };
 export declare enum RelationshipType {
     PARENT = "PARENT",
     SPOUSE = "SPOUSE",
@@ -14,10 +14,12 @@ export declare class UpdateMemberProfileDto {
 export declare class AddRelationshipDto {
     relatedMemberId: string;
     relationshipType: RelationshipType;
+    familyId: string;
 }
 export declare class RemoveRelationshipDto {
     relatedMemberId: string;
     relationshipType: RelationshipType;
+    familyId: string;
 }
 export declare class BulkRelationshipDto {
     relationships: AddRelationshipDto[];

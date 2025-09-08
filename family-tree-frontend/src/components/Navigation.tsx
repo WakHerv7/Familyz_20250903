@@ -1,7 +1,7 @@
 "use client";
 
-import { useAppSelector } from "@/hooks/redux";
-import { useProfile, useLogout, useUnreadNotificationCount } from "@/hooks/api";
+import { useAuthState, useLogout } from "@/hooks/useAuth";
+import { useUnreadNotificationCount } from "@/hooks/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -23,9 +23,8 @@ import {
 } from "lucide-react";
 
 export default function Navigation() {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, profile } = useAuthState();
   const logout = useLogout();
-  const { data: profile } = useProfile();
   const { data: unreadCount } = useUnreadNotificationCount();
   const pathname = usePathname();
 
@@ -42,7 +41,12 @@ export default function Navigation() {
       icon: Users,
       requiresProfile: false,
     },
-
+    {
+      href: "/families",
+      label: "Families",
+      icon: Users,
+      requiresProfile: true,
+    },
     {
       href: "/tree",
       label: "Family Tree",
@@ -132,7 +136,10 @@ export default function Navigation() {
           <div className="flex space-x-1 py-2 overflow-x-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const isActive =
+                pathname === item.href ||
+                (item.href === "/families" &&
+                  pathname.startsWith("/families/"));
               const isDisabled = false; //item.requiresProfile && !profile;
 
               return (

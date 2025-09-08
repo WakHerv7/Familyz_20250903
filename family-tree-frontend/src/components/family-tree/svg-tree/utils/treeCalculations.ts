@@ -118,6 +118,25 @@ export function calculateTreePositions(
 
   console.log("SVG Tree - Positioned", positionedNodes.length, "nodes");
 
+  // Second pass: center the entire tree around (0,0)
+  if (positionedNodes.length > 0) {
+    const minX = Math.min(...positionedNodes.map((n) => n.x));
+    const maxX = Math.max(...positionedNodes.map((n) => n.x));
+    const minY = Math.min(...positionedNodes.map((n) => n.y));
+    const maxY = Math.max(...positionedNodes.map((n) => n.y));
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // Offset all nodes to center the tree at (0,0)
+    positionedNodes.forEach((node) => {
+      node.x -= centerX;
+      node.y -= centerY;
+    });
+
+    console.log("SVG Tree - Centered tree around (0,0)");
+  }
+
   // Create connections
   connections.forEach((conn: any) => {
     if (conn.type === "spouse") {
@@ -171,18 +190,22 @@ export function calculateTreePositions(
  */
 export function calculateViewBox(positionedNodes: PositionedNode[]) {
   if (positionedNodes.length === 0) {
-    return { x: -300, y: 0, w: 1000, h: 800 };
+    return { x: -400, y: -300, w: 800, h: 600 };
   }
 
-  const minX = Math.min(...positionedNodes.map((n) => n.x)) - 150;
-  const maxX = Math.max(...positionedNodes.map((n) => n.x)) + 150;
-  const minY = Math.min(...positionedNodes.map((n) => n.y)) - 150;
-  const maxY = Math.max(...positionedNodes.map((n) => n.y)) + 150;
+  // Since tree is centered at (0,0), calculate bounds symmetrically
+  const maxAbsX = Math.max(...positionedNodes.map((n) => Math.abs(n.x)));
+  const maxAbsY = Math.max(...positionedNodes.map((n) => Math.abs(n.y)));
+
+  // Add padding around the tree for better visibility
+  const padding = 100;
+  const halfWidth = maxAbsX + padding;
+  const halfHeight = maxAbsY + padding;
 
   return {
-    x: minX,
-    y: minY,
-    w: maxX - minX,
-    h: maxY - minY,
+    x: -halfWidth,
+    y: -halfHeight,
+    w: halfWidth * 2,
+    h: halfHeight * 2,
   };
 }

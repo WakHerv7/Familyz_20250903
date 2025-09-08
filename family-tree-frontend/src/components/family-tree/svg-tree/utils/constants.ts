@@ -1,6 +1,6 @@
 // Configuration constants for SVG Family Tree
 export const CONFIG = {
-  gap_v: 400, // Vertical gap between generations
+  gap_v: 300, // Vertical gap between generations (reduced for tighter layout)
   gap_h: 180, // Horizontal gap between family members
   radius: 35, // Circle radius
   extraRadiusWidth: 6, // Extra width for couple connections

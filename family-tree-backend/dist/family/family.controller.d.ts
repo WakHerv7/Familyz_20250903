@@ -1,6 +1,6 @@
-import { FamilyService } from './family.service';
-import { CreateFamilyDto, UpdateFamilyDto, UpdateFamilyMembershipDto, AddMemberToFamilyDto, FamilyResponseDto, FamilyWithMembersDto } from './dto/family.dto';
-import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { FamilyService } from "./family.service";
+import { CreateFamilyDto, UpdateFamilyDto, UpdateFamilyMembershipDto, AddMemberToFamilyDto, FamilyResponseDto, FamilyWithMembersDto } from "./dto/family.dto";
+import { AuthenticatedUser } from "../auth/strategies/jwt.strategy";
 export declare class FamilyController {
     private readonly familyService;
     constructor(familyService: FamilyService);
@@ -21,6 +21,14 @@ export declare class FamilyController {
         message: string;
     }>;
     recalculateSubFamilyMemberships(user: AuthenticatedUser, familyId: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    softDeleteFamily(user: AuthenticatedUser, familyId: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    restoreFamily(user: AuthenticatedUser, familyId: string): Promise<{
         success: boolean;
         message: string;
     }>;

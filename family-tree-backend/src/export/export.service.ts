@@ -91,14 +91,17 @@ export class ExportService {
     return treeData;
   }
 
-  async getFolderTreeDataWithIds(memberId: string): Promise<
+  async getFolderTreeDataWithIds(
+    memberId: string,
+    familyId?: string
+  ): Promise<
     {
       column: number;
       value: string;
       memberIds: { id: string; name: string; gender: string }[];
     }[]
   > {
-    const folderTreeData = await this.getFolderTreeData(memberId);
+    const folderTreeData = await this.getFolderTreeData(memberId, familyId);
 
     // Use the same logic as generateExcelTreeFormat but for all families
     const allMembers = folderTreeData.families.flatMap((f) => f.members);
@@ -124,7 +127,59 @@ export class ExportService {
     return treeData;
   }
 
-  async getFolderTreeData(memberId: string): Promise<FolderTreeExportData> {
+  async getFamilyFolderTreeData(
+    memberId: string,
+    familyId: string
+  ): Promise<
+    {
+      column: number;
+      value: string;
+      memberIds: { id: string; name: string; gender: string }[];
+    }[]
+  > {
+    // Get folder tree data for all accessible families
+    const folderTreeData = await this.getFolderTreeData(memberId);
+
+    // Find the target family to ensure user has access
+    const targetFamily = folderTreeData.families.find((f) => f.id === familyId);
+    if (!targetFamily) {
+      throw new BadRequestException("Family not found or access denied");
+    }
+
+    // Get all members from all families for relationship context
+    const allMembers = folderTreeData.families.flatMap((f) => f.members);
+
+    // Use family-specific tree generation
+    const treeData = this.generateFamilyExcelTreeFormatWithIds(
+      allMembers,
+      targetFamily.members,
+      {
+        format: "excel",
+        scope: "current-family",
+        config: {
+          formats: ["excel"],
+          familyTree: {
+            structure: "folderTree",
+            includeMembersList: false,
+            memberDetails: ["parent", "children", "spouses", "personalInfo"],
+          },
+        },
+        includeData: {
+          personalInfo: false,
+          relationships: true,
+          contactInfo: false,
+          profileImages: false,
+        },
+      }
+    );
+
+    return treeData;
+  }
+
+  async getFolderTreeData(
+    memberId: string,
+    familyId?: string
+  ): Promise<FolderTreeExportData> {
     // Get the member and their family memberships
     const member = await this.prisma.member.findUnique({
       where: { id: memberId },
@@ -363,15 +418,84 @@ export class ExportService {
       };
     });
 
+    // Filter families if familyId is provided
+    let filteredFamilies = transformedFamilies;
+    if (familyId) {
+      // Find the target family
+      const targetFamily = transformedFamilies.find(
+        (family) => family.id === familyId
+      );
+
+      if (targetFamily) {
+        // Create a new family object that includes related members from other families
+        const enhancedTargetFamily = {
+          id: targetFamily.id,
+          name: targetFamily.name,
+          members: [...targetFamily.members], // Start with direct members
+        };
+
+        // Add related members from other families
+        for (const otherFamily of transformedFamilies) {
+          if (otherFamily.id === familyId) continue; // Skip the target family itself
+
+          for (const member of otherFamily.members) {
+            // Check if this member has relationships with the target family
+            const hasSpouseInTargetFamily = member.spouses?.some(
+              (spouse: any) =>
+                targetFamily.members.some(
+                  (targetMember) => targetMember.id === spouse.id
+                )
+            );
+
+            const hasChildInTargetFamily = member.children?.some((child: any) =>
+              targetFamily.members.some(
+                (targetMember) => targetMember.id === child.id
+              )
+            );
+
+            const hasParentInTargetFamily = member.parents?.some(
+              (parent: any) =>
+                targetFamily.members.some(
+                  (targetMember) => targetMember.id === parent.id
+                )
+            );
+
+            // If this member has any relationship with the target family, include them
+            if (
+              hasSpouseInTargetFamily ||
+              hasChildInTargetFamily ||
+              hasParentInTargetFamily
+            ) {
+              // Check if this member is already in the target family
+              const alreadyExists = enhancedTargetFamily.members.some(
+                (m) => m.id === member.id
+              );
+              if (!alreadyExists) {
+                enhancedTargetFamily.members.push({
+                  ...member,
+                  isDirectMember: false, // Mark as indirect member
+                });
+              }
+            }
+          }
+        }
+
+        filteredFamilies = [enhancedTargetFamily];
+      } else {
+        // If target family not found, return empty
+        filteredFamilies = [];
+      }
+    }
+
     // Get all unique members for members list
-    const allMembers = transformedFamilies.flatMap((family) => family.members);
+    const allMembers = filteredFamilies.flatMap((family) => family.members);
     const uniqueMembers = allMembers.filter(
       (member, index, array) =>
         array.findIndex((m) => m.id === member.id) === index
     );
 
     return {
-      families: transformedFamilies,
+      families: filteredFamilies,
       membersList: uniqueMembers,
       generatedAt: new Date(),
       exportConfig: {
@@ -2255,6 +2379,712 @@ export class ExportService {
 
     console.log(
       "✅ Excel tree generation with IDs completed, entries:",
+      treeData.length
+    );
+    return treeData;
+  }
+
+  private generateFamilyExcelTreeFormatWithIds(
+    allMembers: any[],
+    targetFamilyMembers: any[],
+    exportRequest: ExportRequest
+  ): {
+    column: number;
+    value: string;
+    memberIds: { id: string; name: string; gender: string }[];
+  }[] {
+    console.log(
+      "🔍 Starting generateFamilyExcelTreeFormatWithIds with target family members:",
+      targetFamilyMembers.length,
+      "and all members:",
+      allMembers.length
+    );
+
+    const treeData: {
+      column: number;
+      value: string;
+      memberIds: { id: string; name: string; gender: string }[];
+    }[] = [];
+
+    // Build proper family tree using existing relationships from database
+    const memberMap = new Map<string, any>();
+
+    // First pass: Index all members by ID and normalize data
+    allMembers.forEach((member) => {
+      const normalizedMember = {
+        id: member.id,
+        name: member.name,
+        gender: member.gender || "UNKNOWN",
+        parents: member.parents || [],
+        children: member.children || [],
+        spouses: member.spouses || [],
+        generation: member.generation || 0,
+        personalInfo: member.personalInfo,
+      };
+      memberMap.set(member.id, normalizedMember);
+    });
+
+    // Second pass: Include spouses' family members to ensure complete representation
+    console.log(
+      "🔗 Including spouses' family members for complete tree representation..."
+    );
+    const additionalMembers = new Map<string, any>();
+
+    for (const [memberId, member] of memberMap.entries()) {
+      if (member.spouses && member.spouses.length > 0) {
+        member.spouses.forEach((spouse: any) => {
+          // Add spouse if not already in memberMap
+          if (!memberMap.has(spouse.id) && !additionalMembers.has(spouse.id)) {
+            console.log(`👫 Adding spouse's family member: ${spouse.name}`);
+            additionalMembers.set(spouse.id, {
+              id: spouse.id,
+              name: spouse.name,
+              gender: spouse.gender || "UNKNOWN",
+              parents: spouse.parents || [],
+              children: spouse.children || [],
+              spouses: spouse.spouses || [],
+              generation: spouse.generation || 0,
+              personalInfo: spouse.personalInfo,
+            });
+          }
+        });
+      }
+    }
+
+    // Add additional members to the main memberMap
+    for (const [memberId, member] of additionalMembers.entries()) {
+      memberMap.set(memberId, member);
+    }
+
+    console.log(
+      `📊 Total members after including spouses' families: ${memberMap.size}`
+    );
+
+    // Normalize relationships to ensure bidirectionality
+    this.normalizeRelationships(memberMap);
+
+    console.log("📊 Total members indexed:", memberMap.size);
+
+    // Build parent-child relationships map for easier traversal
+    const parentChildMap = new Map<string, string[]>();
+    const childParentMap = new Map<string, string[]>();
+
+    allMembers.forEach((member) => {
+      // Map children to their parents
+      if (member.children && member.children.length > 0) {
+        parentChildMap.set(
+          member.id,
+          member.children.map((c: any) => c.id)
+        );
+
+        // Also map each child back to this parent
+        member.children.forEach((child: any) => {
+          if (!childParentMap.has(child.id)) {
+            childParentMap.set(child.id, []);
+          }
+          childParentMap.get(child.id)!.push(member.id);
+        });
+      }
+
+      // Map parents to their children
+      if (member.parents && member.parents.length > 0) {
+        member.parents.forEach((parent: any) => {
+          if (!parentChildMap.has(parent.id)) {
+            parentChildMap.set(parent.id, []);
+          }
+          if (!parentChildMap.get(parent.id)!.includes(member.id)) {
+            parentChildMap.get(parent.id)!.push(member.id);
+          }
+        });
+
+        childParentMap.set(
+          member.id,
+          member.parents.map((p: any) => p.id)
+        );
+      }
+    });
+
+    // Find true root ancestors with spouse consideration - but only from target family
+    const targetFamilyMemberIds = new Set(targetFamilyMembers.map((m) => m.id));
+    const potentialRoots = Array.from(memberMap.values()).filter((member) => {
+      // Only consider members from the target family as potential roots
+      if (!targetFamilyMemberIds.has(member.id)) return false;
+
+      const parentIds = childParentMap.get(member.id) || [];
+      return parentIds.length === 0;
+    });
+
+    // Filter out members who have no parents but their spouse has parents
+    const trueRoots = potentialRoots.filter((member) => {
+      // If member has no spouses, they are a true root
+      if (!member.spouses || member.spouses.length === 0) {
+        return true;
+      }
+
+      // Check if any spouse has parents
+      const hasSpouseWithParents = member.spouses.some((spouse: any) => {
+        const spouseMember = memberMap.get(spouse.id);
+        if (!spouseMember) return false;
+
+        const spouseParentIds = childParentMap.get(spouse.id) || [];
+        return spouseParentIds.length > 0;
+      });
+
+      // If spouse has parents, this member is not a true root
+      return !hasSpouseWithParents;
+    });
+
+    console.log(
+      "👴 True root ancestors found (from target family):",
+      trueRoots.map((r) => r.name)
+    );
+
+    // Group married couples at the root level
+    const rootAncestors = [];
+    const processedRootIds = new Set();
+
+    trueRoots.forEach((member) => {
+      if (processedRootIds.has(member.id)) return;
+
+      // Check if this member has a spouse who is also a root
+      const spouseIds = member.spouses.map((s: any) => s.id);
+      const rootSpouses = spouseIds
+        .map((spouseId) => memberMap.get(spouseId))
+        .filter(
+          (spouse) => spouse && trueRoots.some((r) => r.id === spouse.id)
+        );
+
+      if (rootSpouses.length > 0) {
+        // Create a couple entry - use the male as primary if possible
+        const malePartner =
+          member.gender === "MALE"
+            ? member
+            : rootSpouses.find((s) => s.gender === "MALE");
+        const primaryPartner = malePartner || member;
+
+        rootAncestors.push(primaryPartner);
+        processedRootIds.add(member.id);
+        rootSpouses.forEach((spouse) => processedRootIds.add(spouse.id));
+      } else {
+        // Single root ancestor
+        rootAncestors.push(member);
+        processedRootIds.add(member.id);
+      }
+    });
+
+    rootAncestors.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Calculate generations from each root
+    const generations = new Map<string, number>();
+
+    const assignGenerations = (
+      memberId: string,
+      generation: number,
+      visited = new Set<string>()
+    ) => {
+      if (visited.has(memberId)) return;
+      visited.add(memberId);
+
+      const existingGen = generations.get(memberId);
+      if (existingGen === undefined || generation < existingGen) {
+        generations.set(memberId, generation);
+      }
+
+      const childIds = parentChildMap.get(memberId) || [];
+      childIds.forEach((childId) => {
+        if (memberMap.has(childId)) {
+          assignGenerations(childId, generation + 1, new Set(visited));
+        }
+      });
+    };
+
+    // Assign generations starting from roots
+    rootAncestors.forEach((root) => {
+      assignGenerations(root.id, 0);
+    });
+
+    const processedMembers = new Set<string>();
+
+    // Identify all couples (with or without shared children)
+    const coupleChildrenMap = new Map<string, string[]>();
+    const allCouplesMap = new Map<string, { spouseId: string; spouse: any }>();
+    const processedCouples = new Set<string>();
+
+    console.log("🔍 Identifying couples from members...");
+    allMembers.forEach((member) => {
+      if (member.spouses && member.spouses.length > 0) {
+        console.log(
+          `👤 Member ${member.name} has ${member.spouses.length} spouses`
+        );
+        member.spouses.forEach((spouse: any) => {
+          const coupleKey1 = `${member.id}_${spouse.id}`;
+          const coupleKey2 = `${spouse.id}_${member.id}`;
+
+          if (
+            !processedCouples.has(coupleKey1) &&
+            !processedCouples.has(coupleKey2)
+          ) {
+            processedCouples.add(coupleKey1);
+
+            // Store all couples
+            allCouplesMap.set(coupleKey1, { spouseId: spouse.id, spouse });
+            console.log(
+              `💑 Identified couple: ${member.name} + ${spouse.name}`
+            );
+
+            // Find shared children between this couple
+            const memberChildren = parentChildMap.get(member.id) || [];
+            const spouseChildren = parentChildMap.get(spouse.id) || [];
+            const sharedChildren = memberChildren.filter((childId) =>
+              spouseChildren.includes(childId)
+            );
+
+            if (sharedChildren.length > 0) {
+              coupleChildrenMap.set(coupleKey1, sharedChildren);
+              console.log(
+                `👶 Couple has ${sharedChildren.length} shared children`
+              );
+            } else {
+              console.log(`👶 Couple has no shared children`);
+            }
+          }
+        });
+      }
+    });
+
+    console.log(`📊 Total couples identified: ${allCouplesMap.size}`);
+    console.log(`👶 Couples with shared children: ${coupleChildrenMap.size}`);
+
+    const generateTree = (
+      memberId: string,
+      generation = 0,
+      depth = 0
+    ): {
+      column: number;
+      value: string;
+      memberIds: { id: string; name: string; gender: string }[];
+    }[] => {
+      console.log(
+        `🌲 Traversing member: ${
+          memberMap.get(memberId)?.name
+        } (Gen ${generation}, depth ${depth})`
+      );
+
+      if (
+        processedMembers.has(memberId) ||
+        depth > 8 ||
+        !memberMap.has(memberId)
+      ) {
+        console.log(
+          `🚫 Skipping ${
+            memberMap.get(memberId)?.name
+          } - already processed or invalid`
+        );
+        return [];
+      }
+
+      const member = memberMap.get(memberId);
+      const result: {
+        column: number;
+        value: string;
+        memberIds: { id: string; name: string; gender: string }[];
+      }[] = [];
+
+      // Check if this member is part of any couple (with or without shared children)
+      let handledAsCouple = false;
+
+      // First check couples with shared children
+      for (const [coupleKey, sharedChildIds] of coupleChildrenMap.entries()) {
+        const [member1Id, member2Id] = coupleKey.split("_");
+
+        if (member1Id === memberId && !processedMembers.has(member2Id)) {
+          console.log(
+            `💑 Found couple with children: ${member.name} + ${
+              memberMap.get(member2Id)?.name
+            }`
+          );
+          console.log(
+            `👶 Shared children: ${sharedChildIds
+              .map((id) => memberMap.get(id)?.name)
+              .join(", ")}`
+          );
+
+          // This member is the primary in a couple - show both partners
+          processedMembers.add(member1Id);
+          processedMembers.add(member2Id);
+
+          const spouse = memberMap.get(member2Id);
+          const relationshipLabel = this.getRelationshipLabel(generation);
+
+          const genderSymbol1 = this.getGenderSymbol(member.gender);
+          const genderSymbol2 = this.getGenderSymbol(
+            spouse?.gender || "UNKNOWN"
+          );
+
+          let value = `${member.name} ${genderSymbol1} ⚭ ${spouse?.name} ${genderSymbol2}`;
+
+          if (relationshipLabel) {
+            value += ` [${relationshipLabel}]`;
+          }
+          const coupleMemberIds = [
+            { id: member.id, name: member.name, gender: member.gender },
+            { id: spouse.id, name: spouse.name, gender: spouse.gender },
+          ];
+          console.log(`👫 COUPLE WITH CHILDREN: ${value}`);
+          console.log(
+            `👫 Member IDs:`,
+            coupleMemberIds.map((m) => `${m.name} (${m.id})`)
+          );
+          console.log(`👫 Total memberIds count: ${coupleMemberIds.length}`);
+
+          result.push({
+            column: generation,
+            value,
+            memberIds: coupleMemberIds,
+          });
+
+          // Add shared children
+          const unprocessedChildren = sharedChildIds
+            .filter(
+              (childId) =>
+                !processedMembers.has(childId) && memberMap.has(childId)
+            )
+            .map((childId) => memberMap.get(childId))
+            .sort((a, b) => {
+              const genA = generations.get(a.id) || 0;
+              const genB = generations.get(b.id) || 0;
+              if (genA !== genB) return genA - genB;
+              return a.name.localeCompare(b.name);
+            });
+
+          console.log(
+            `👶 Processing ${unprocessedChildren.length} shared children`
+          );
+          unprocessedChildren.forEach((child) => {
+            result.push(...generateTree(child.id, generation + 1, depth + 1));
+          });
+
+          handledAsCouple = true;
+          break;
+        }
+      }
+
+      // If not handled as couple with children, check all couples
+      if (!handledAsCouple) {
+        for (const [coupleKey, coupleData] of allCouplesMap.entries()) {
+          const [member1Id, member2Id] = coupleKey.split("_");
+
+          if (member1Id === memberId && !processedMembers.has(member2Id)) {
+            console.log(
+              `💑 Found couple without children: ${member.name} + ${
+                memberMap.get(member2Id)?.name
+              }`
+            );
+
+            // This member is part of a couple - show both partners
+            processedMembers.add(member1Id);
+            processedMembers.add(member2Id);
+
+            const spouse = memberMap.get(member2Id);
+            const relationshipLabel = this.getRelationshipLabel(generation);
+
+            const genderSymbol1 = this.getGenderSymbol(member.gender);
+            const genderSymbol2 = this.getGenderSymbol(
+              spouse?.gender || "UNKNOWN"
+            );
+
+            let value = `${member.name} ${genderSymbol1} ⚭ ${spouse?.name} ${genderSymbol2}`;
+
+            if (relationshipLabel) {
+              value += ` [${relationshipLabel}]`;
+            }
+            const coupleMemberIds = [
+              { id: member.id, name: member.name, gender: member.gender },
+              { id: spouse.id, name: spouse.name, gender: spouse.gender },
+            ];
+            console.log(`👫 COUPLE WITHOUT CHILDREN: ${value}`);
+            console.log(
+              `👫 Member IDs:`,
+              coupleMemberIds.map((m) => `${m.name} (${m.id})`)
+            );
+            console.log(`👫 Total memberIds count: ${coupleMemberIds.length}`);
+
+            result.push({
+              column: generation,
+              value,
+              memberIds: coupleMemberIds,
+            });
+
+            // Add children from both partners
+            const allChildren = new Set([
+              ...(parentChildMap.get(member1Id) || []),
+              ...(parentChildMap.get(member2Id) || []),
+            ]);
+
+            console.log(
+              `👶 All children from both partners: ${Array.from(allChildren)
+                .map((id) => memberMap.get(id)?.name)
+                .join(", ")}`
+            );
+
+            const unprocessedChildren = Array.from(allChildren)
+              .filter(
+                (childId) =>
+                  !processedMembers.has(childId) && memberMap.has(childId)
+              )
+              .map((childId) => memberMap.get(childId))
+              .sort((a, b) => {
+                const genA = generations.get(a.id) || 0;
+                const genB = generations.get(b.id) || 0;
+                if (genA !== genB) return genA - genB;
+                return a.name.localeCompare(b.name);
+              });
+
+            console.log(
+              `👶 Processing ${unprocessedChildren.length} children from both partners`
+            );
+            unprocessedChildren.forEach((child) => {
+              result.push(...generateTree(child.id, generation + 1, depth + 1));
+            });
+
+            handledAsCouple = true;
+            break;
+          }
+        }
+      }
+
+      if (!handledAsCouple) {
+        // Check if this member has an unprocessed spouse - if so, create a couple entry
+        let spouseHandled = false;
+        if (member.spouses && member.spouses.length > 0) {
+          const unprocessedSpouses = member.spouses.filter(
+            (spouse: any) =>
+              !processedMembers.has(spouse.id) && memberMap.has(spouse.id)
+          );
+
+          if (unprocessedSpouses.length > 0) {
+            // Create a couple entry for this member and their spouse
+            const spouse = unprocessedSpouses[0]; // Take the first unprocessed spouse
+            const spouseMember = memberMap.get(spouse.id);
+
+            console.log(
+              `💑 Creating couple entry for: ${member.name} + ${spouseMember?.name}`
+            );
+
+            processedMembers.add(memberId);
+            processedMembers.add(spouse.id);
+
+            const genderSymbol1 = this.getGenderSymbol(member.gender);
+            const genderSymbol2 = this.getGenderSymbol(
+              spouseMember?.gender || "UNKNOWN"
+            );
+            const relationshipLabel = this.getRelationshipLabel(generation);
+
+            let value = `${member.name} ${genderSymbol1} ⚭ ${spouseMember?.name} ${genderSymbol2}`;
+
+            if (relationshipLabel) {
+              value += ` [${relationshipLabel}]`;
+            }
+
+            const coupleMemberIds = [
+              { id: member.id, name: member.name, gender: member.gender },
+              { id: spouse.id, name: spouse.name, gender: spouse.gender },
+            ];
+
+            console.log(`👫 COUPLE ENTRY: ${value}`);
+            console.log(
+              `👫 Member IDs:`,
+              coupleMemberIds.map((m) => `${m.name} (${m.id})`)
+            );
+            console.log(`👫 Total memberIds count: ${coupleMemberIds.length}`);
+
+            result.push({
+              column: generation,
+              value,
+              memberIds: coupleMemberIds,
+            });
+
+            // Add children from both partners
+            const allChildren = new Set([
+              ...(parentChildMap.get(memberId) || []),
+              ...(parentChildMap.get(spouse.id) || []),
+            ]);
+
+            const unprocessedChildren = Array.from(allChildren)
+              .filter(
+                (childId) =>
+                  !processedMembers.has(childId) && memberMap.has(childId)
+              )
+              .map((childId) => memberMap.get(childId))
+              .sort((a, b) => {
+                const genA = generations.get(a.id) || 0;
+                const genB = generations.get(b.id) || 0;
+                if (genA !== genB) return genA - genB;
+                return a.name.localeCompare(b.name);
+              });
+
+            console.log(
+              `👶 Processing ${unprocessedChildren.length} children from couple`
+            );
+            unprocessedChildren.forEach((child) => {
+              result.push(...generateTree(child.id, generation + 1, depth + 1));
+            });
+
+            spouseHandled = true;
+          }
+        }
+
+        if (!spouseHandled) {
+          console.log(`👤 Processing individual member: ${member.name}`);
+          // Handle as individual member
+          processedMembers.add(memberId);
+
+          const genderSymbol = this.getGenderSymbol(member.gender);
+          const relationshipLabel = this.getRelationshipLabel(generation);
+
+          let value = `${member.name} ${genderSymbol}`;
+
+          // Add spouse information for display (but spouses already processed)
+          if (member.spouses && member.spouses.length > 0) {
+            const spouseNames = member.spouses
+              .filter((spouse: any) => processedMembers.has(spouse.id)) // Only show already processed spouses
+              .map((spouse: any) => {
+                const spouseGender = this.getGenderSymbol(
+                  spouse.gender || "UNKNOWN"
+                );
+                return `${spouse.name} ${spouseGender}`;
+              });
+
+            if (spouseNames.length > 0) {
+              value += ` ⚭ ${spouseNames.join(" & ")}`;
+            }
+          }
+
+          // Add relationship label
+          if (relationshipLabel) {
+            value += ` [${relationshipLabel}]`;
+          }
+
+          result.push({
+            column: generation,
+            value,
+            memberIds: [
+              { id: member.id, name: member.name, gender: member.gender },
+            ],
+          });
+
+          // Add children
+          const childIds = parentChildMap.get(memberId) || [];
+          console.log(
+            `👶 Individual member ${member.name} has ${
+              childIds.length
+            } children: ${childIds
+              .map((id) => memberMap.get(id)?.name)
+              .join(", ")}`
+          );
+
+          const unprocessedChildren = childIds
+            .filter(
+              (childId) =>
+                !processedMembers.has(childId) && memberMap.has(childId)
+            )
+            .map((childId) => memberMap.get(childId))
+            .sort((a, b) => {
+              const genA = generations.get(a.id) || 0;
+              const genB = generations.get(b.id) || 0;
+              if (genA !== genB) return genA - genB;
+              return a.name.localeCompare(b.name);
+            });
+
+          console.log(
+            `👶 Processing ${unprocessedChildren.length} unprocessed children for ${member.name}`
+          );
+          unprocessedChildren.forEach((child) => {
+            result.push(...generateTree(child.id, generation + 1, depth + 1));
+          });
+        }
+      }
+
+      return result;
+    };
+
+    console.log("🌳 Starting tree generation for root ancestors...");
+    console.log(
+      "👴 Root ancestors:",
+      rootAncestors.map((r) => `${r.name} (Gen ${generations.get(r.id) || 0})`)
+    );
+
+    // Generate trees for all root ancestors
+    if (rootAncestors.length > 0) {
+      rootAncestors.forEach((rootAncestor, index) => {
+        console.log(
+          `🌲 Processing root ancestor ${index + 1}: ${rootAncestor.name}`
+        );
+        if (index > 0) {
+          treeData.push({ column: 0, value: "", memberIds: [] }); // Empty line between trees
+        }
+        const treeEntries = generateTree(rootAncestor.id);
+        console.log(
+          `📄 Generated ${treeEntries.length} tree entries for ${rootAncestor.name}`
+        );
+        treeData.push(...treeEntries);
+      });
+    } else {
+      treeData.push({
+        column: 0,
+        value: "=== All Family Members (No Clear Hierarchy) ===",
+        memberIds: [],
+      });
+      Array.from(memberMap.values()).forEach((member) => {
+        const genderSymbol = this.getGenderSymbol(member.gender);
+        treeData.push({
+          column: 0,
+          value: `${member.name} ${genderSymbol}`,
+          memberIds: [
+            { id: member.id, name: member.name, gender: member.gender },
+          ],
+        });
+      });
+    }
+
+    // Add any remaining unprocessed members
+    const unprocessedMembers = Array.from(memberMap.values()).filter(
+      (m) => !processedMembers.has(m.id)
+    );
+
+    if (unprocessedMembers.length > 0) {
+      treeData.push({ column: 0, value: "", memberIds: [] });
+      treeData.push({
+        column: 0,
+        value: "=== Additional Family Members ===",
+        memberIds: [],
+      });
+      unprocessedMembers
+        .sort((a, b) => {
+          const genA = generations.get(a.id) || 0;
+          const genB = generations.get(b.id) || 0;
+          if (genA !== genB) return genA - genB;
+          return a.name.localeCompare(b.name);
+        })
+        .forEach((member) => {
+          const genderSymbol = this.getGenderSymbol(member.gender);
+          const generation = generations.get(member.id) || 0;
+          const relationshipLabel = this.getRelationshipLabel(generation);
+
+          let value = `${member.name} ${genderSymbol}`;
+          if (relationshipLabel) value += ` [${relationshipLabel}]`;
+          treeData.push({
+            column: generation,
+            value,
+            memberIds: [
+              { id: member.id, name: member.name, gender: member.gender },
+            ],
+          });
+        });
+    }
+
+    console.log(
+      "✅ Family-specific Excel tree generation with IDs completed, entries:",
       treeData.length
     );
     return treeData;

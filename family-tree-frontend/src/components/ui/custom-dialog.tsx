@@ -78,7 +78,7 @@ const CustomDialog: React.FC<CustomDialogProps> = ({
       />
 
       {/* Dialog Content */}
-      <div className="relative z-10 animate-in zoom-in-95 fade-in-0 duration-200 w-full max-w-lg">
+      <div className="relative z-10 animate-in zoom-in-95 fade-in-0 duration-200 w-full max-w-xl">
         {children}
       </div>
     </div>

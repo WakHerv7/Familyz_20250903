@@ -18,7 +18,7 @@ let FamilyService = class FamilyService {
     }
     async createFamily(user, createDto) {
         if (!user.memberId) {
-            throw new common_1.NotFoundException('Member profile not found');
+            throw new common_1.NotFoundException("Member profile not found");
         }
         if (createDto.parentFamilyId) {
             await this.verifyFamilyAccess(user, createDto.parentFamilyId);
@@ -38,23 +38,26 @@ let FamilyService = class FamilyService {
                     parentFamilyId: createDto.parentFamilyId,
                 },
             });
-            await prisma.familyMembership.create({
-                data: {
-                    memberId: user.memberId,
-                    familyId: family.id,
-                    role: 'ADMIN',
-                    type: createDto.isSubFamily ? 'SUB' : 'MAIN',
-                    autoEnrolled: false,
-                    manuallyEdited: false,
-                },
-            });
-            if (createDto.headOfFamilyId && createDto.headOfFamilyId !== user.memberId) {
+            if (createDto.addCreatorAsMember !== false) {
+                await prisma.familyMembership.create({
+                    data: {
+                        memberId: user.memberId,
+                        familyId: family.id,
+                        role: "ADMIN",
+                        type: createDto.isSubFamily ? "SUB" : "MAIN",
+                        autoEnrolled: false,
+                        manuallyEdited: false,
+                    },
+                });
+            }
+            if (createDto.headOfFamilyId &&
+                createDto.headOfFamilyId !== user.memberId) {
                 await prisma.familyMembership.create({
                     data: {
                         memberId: createDto.headOfFamilyId,
                         familyId: family.id,
-                        role: 'HEAD',
-                        type: createDto.isSubFamily ? 'SUB' : 'MAIN',
+                        role: "HEAD",
+                        type: createDto.isSubFamily ? "SUB" : "MAIN",
                         autoEnrolled: true,
                         manuallyEdited: false,
                     },
@@ -65,7 +68,7 @@ let FamilyService = class FamilyService {
     }
     async getFamilies(user) {
         if (!user.memberId) {
-            throw new common_1.NotFoundException('Member profile not found');
+            throw new common_1.NotFoundException("Member profile not found");
         }
         const memberships = await this.prisma.familyMembership.findMany({
             where: {
@@ -76,7 +79,9 @@ let FamilyService = class FamilyService {
                 family: true,
             },
         });
-        return memberships.map(membership => membership.family);
+        return memberships
+            .filter((membership) => membership.family && !membership.family.deletedAt)
+            .map((membership) => membership.family);
     }
     async getFamilyDetails(user, familyId) {
         await this.verifyFamilyAccess(user, familyId);
@@ -107,11 +112,14 @@ let FamilyService = class FamilyService {
             },
         });
         if (!family) {
-            throw new common_1.NotFoundException('Family not found');
+            throw new common_1.NotFoundException("Family not found");
+        }
+        if (family.deletedAt) {
+            throw new common_1.NotFoundException("Family not found");
         }
         return {
             ...family,
-            members: family.memberships.map(membership => ({
+            members: family.memberships.map((membership) => ({
                 id: membership.member.id,
                 name: membership.member.name,
                 role: membership.role,
@@ -133,7 +141,7 @@ let FamilyService = class FamilyService {
                 },
             });
             if (!membership) {
-                throw new common_1.BadRequestException('New head must be a member of this family');
+                throw new common_1.BadRequestException("New head must be a member of this family");
             }
         }
         return this.prisma.family.update({
@@ -152,7 +160,7 @@ let FamilyService = class FamilyService {
         });
         if (existingMembership) {
             if (existingMembership.isActive) {
-                throw new common_1.BadRequestException('Member is already in this family');
+                throw new common_1.BadRequestException("Member is already in this family");
             }
             else {
                 await this.prisma.familyMembership.update({
@@ -160,7 +168,7 @@ let FamilyService = class FamilyService {
                     data: {
                         isActive: true,
                         role: addMemberDto.role,
-                        type: addMemberDto.type || 'MAIN',
+                        type: addMemberDto.type || "MAIN",
                     },
                 });
                 return;
@@ -171,7 +179,7 @@ let FamilyService = class FamilyService {
                 memberId: addMemberDto.memberId,
                 familyId,
                 role: addMemberDto.role,
-                type: addMemberDto.type || 'MAIN',
+                type: addMemberDto.type || "MAIN",
                 autoEnrolled: false,
                 manuallyEdited: true,
             },
@@ -186,7 +194,7 @@ let FamilyService = class FamilyService {
             },
         });
         if (!membership) {
-            throw new common_1.NotFoundException('Membership not found');
+            throw new common_1.NotFoundException("Membership not found");
         }
         await this.prisma.familyMembership.update({
             where: { id: membership.id },
@@ -200,7 +208,7 @@ let FamilyService = class FamilyService {
             select: { creatorId: true },
         });
         if (family?.creatorId === memberId) {
-            throw new common_1.BadRequestException('Cannot remove family creator');
+            throw new common_1.BadRequestException("Cannot remove family creator");
         }
         const membership = await this.prisma.familyMembership.findFirst({
             where: {
@@ -209,30 +217,87 @@ let FamilyService = class FamilyService {
             },
         });
         if (!membership) {
-            throw new common_1.NotFoundException('Membership not found');
+            throw new common_1.NotFoundException("Membership not found");
         }
         await this.prisma.familyMembership.update({
             where: { id: membership.id },
             data: { isActive: false },
         });
     }
+    async softDeleteFamily(user, familyId) {
+        const family = await this.prisma.family.findUnique({
+            where: { id: familyId },
+            select: { creatorId: true, deletedAt: true },
+        });
+        if (!family) {
+            throw new common_1.NotFoundException("Family not found");
+        }
+        if (family.creatorId !== user.memberId) {
+            throw new common_1.ForbiddenException("Only family creator can delete the family");
+        }
+        if (family.deletedAt) {
+            throw new common_1.BadRequestException("Family is already deleted");
+        }
+        const activeSubFamilies = await this.prisma.family.findMany({
+            where: {
+                parentFamilyId: familyId,
+                deletedAt: null,
+            },
+            select: { id: true },
+        });
+        if (activeSubFamilies.length > 0) {
+            throw new common_1.BadRequestException("Cannot delete family with active sub-families. Delete sub-families first.");
+        }
+        await this.prisma.family.update({
+            where: { id: familyId },
+            data: { deletedAt: new Date() },
+        });
+    }
+    async restoreFamily(user, familyId) {
+        const family = await this.prisma.family.findUnique({
+            where: { id: familyId },
+            select: { creatorId: true, deletedAt: true, parentFamilyId: true },
+        });
+        if (!family) {
+            throw new common_1.NotFoundException("Family not found");
+        }
+        if (family.creatorId !== user.memberId) {
+            throw new common_1.ForbiddenException("Only family creator can restore the family");
+        }
+        if (!family.deletedAt) {
+            throw new common_1.BadRequestException("Family is not deleted");
+        }
+        if (family.parentFamilyId) {
+            const parentFamily = await this.prisma.family.findUnique({
+                where: { id: family.parentFamilyId },
+                select: { deletedAt: true },
+            });
+            if (parentFamily?.deletedAt) {
+                throw new common_1.BadRequestException("Cannot restore sub-family when parent family is deleted");
+            }
+        }
+        await this.prisma.family.update({
+            where: { id: familyId },
+            data: { deletedAt: null },
+        });
+    }
     async deleteFamily(user, familyId) {
         const family = await this.prisma.family.findUnique({
             where: { id: familyId },
-            select: { creatorId: true },
+            select: { creatorId: true, deletedAt: true },
         });
         if (!family) {
-            throw new common_1.NotFoundException('Family not found');
+            throw new common_1.NotFoundException("Family not found");
         }
         if (family.creatorId !== user.memberId) {
-            throw new common_1.ForbiddenException('Only family creator can delete the family');
+            throw new common_1.ForbiddenException("Only family creator can delete the family");
         }
         const subFamilies = await this.prisma.family.findMany({
             where: { parentFamilyId: familyId },
             select: { id: true },
         });
         if (subFamilies.length > 0) {
-            throw new common_1.BadRequestException('Cannot delete family with sub-families. Delete sub-families first.');
+            throw new common_1.BadRequestException("Cannot delete family with sub-families. Delete sub-families first.");
         }
         await this.prisma.family.delete({
             where: { id: familyId },
@@ -251,12 +316,12 @@ let FamilyService = class FamilyService {
             },
         });
         if (!family || !family.isSubFamily || !family.headOfFamily) {
-            throw new common_1.BadRequestException('Invalid sub-family for membership calculation');
+            throw new common_1.BadRequestException("Invalid sub-family for membership calculation");
         }
         const head = family.headOfFamily;
         const autoMembers = new Set();
         autoMembers.add(head.id);
-        head.spouses.forEach(spouse => autoMembers.add(spouse.id));
+        head.spouses.forEach((spouse) => autoMembers.add(spouse.id));
         const addDescendants = async (memberId) => {
             const member = await this.prisma.member.findUnique({
                 where: { id: memberId },
@@ -266,7 +331,7 @@ let FamilyService = class FamilyService {
                 },
             });
             if (member) {
-                member.children.forEach(child => {
+                member.children.forEach((child) => {
                     autoMembers.add(child.id);
                     addDescendants(child.id);
                 });
@@ -275,7 +340,7 @@ let FamilyService = class FamilyService {
                         where: { id: child.id },
                         include: { spouses: true },
                     });
-                    childWithSpouses?.spouses.forEach(spouse => autoMembers.add(spouse.id));
+                    childWithSpouses?.spouses.forEach((spouse) => autoMembers.add(spouse.id));
                 });
             }
         };
@@ -303,8 +368,8 @@ let FamilyService = class FamilyService {
                     data: {
                         memberId,
                         familyId,
-                        role: memberId === head.id ? 'HEAD' : 'MEMBER',
-                        type: 'SUB',
+                        role: memberId === head.id ? "HEAD" : "MEMBER",
+                        type: "SUB",
                         autoEnrolled: true,
                         manuallyEdited: false,
                     },
@@ -314,7 +379,7 @@ let FamilyService = class FamilyService {
     }
     async verifyFamilyAccess(user, familyId) {
         if (!user.memberId) {
-            throw new common_1.NotFoundException('Member profile not found');
+            throw new common_1.NotFoundException("Member profile not found");
         }
         const membership = await this.prisma.familyMembership.findFirst({
             where: {
@@ -322,30 +387,42 @@ let FamilyService = class FamilyService {
                 familyId,
                 isActive: true,
             },
+            include: {
+                family: true,
+            },
         });
-        if (!membership) {
-            throw new common_1.ForbiddenException('Access denied to this family');
+        if (!membership || !membership.family) {
+            throw new common_1.ForbiddenException("Access denied to this family");
+        }
+        if (membership.family.deletedAt) {
+            throw new common_1.NotFoundException("Family not found");
         }
     }
     async verifyFamilyAdminAccess(user, familyId) {
         if (!user.memberId) {
-            throw new common_1.NotFoundException('Member profile not found');
+            throw new common_1.NotFoundException("Member profile not found");
         }
         const membership = await this.prisma.familyMembership.findFirst({
             where: {
                 memberId: user.memberId,
                 familyId,
                 isActive: true,
-                role: { in: ['ADMIN', 'HEAD'] },
+                role: { in: ["ADMIN", "HEAD"] },
+            },
+            include: {
+                family: true,
             },
         });
-        if (!membership) {
-            throw new common_1.ForbiddenException('Admin access required for this family');
+        if (!membership || !membership.family) {
+            throw new common_1.ForbiddenException("Admin access required for this family");
+        }
+        if (membership.family.deletedAt) {
+            throw new common_1.NotFoundException("Family not found");
         }
     }
     async verifyMemberAccess(user, memberId) {
         if (!user.memberId) {
-            throw new common_1.NotFoundException('Member profile not found');
+            throw new common_1.NotFoundException("Member profile not found");
         }
         const userFamilies = await this.prisma.familyMembership.findMany({
             where: {
@@ -354,7 +431,7 @@ let FamilyService = class FamilyService {
             },
             select: { familyId: true },
         });
-        const userFamilyIds = userFamilies.map(f => f.familyId);
+        const userFamilyIds = userFamilies.map((f) => f.familyId);
         const targetMemberFamilies = await this.prisma.familyMembership.findMany({
             where: {
                 memberId,
@@ -363,7 +440,7 @@ let FamilyService = class FamilyService {
             },
         });
         if (targetMemberFamilies.length === 0) {
-            throw new common_1.ForbiddenException('Access denied to this member');
+            throw new common_1.ForbiddenException("Access denied to this member");
         }
     }
 };

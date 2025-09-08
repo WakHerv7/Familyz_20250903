@@ -171,10 +171,11 @@ export interface Family {
 export interface AddRelationshipRequest {
   relatedMemberId: string;
   relationshipType: RelationshipType;
+  familyId: string;
 }
 
 export interface UpdateMemberRequest {
-  name?: string;
+  name: string;
   gender?: Gender;
   status?: MemberStatus;
   personalInfo?: PersonalInfo;

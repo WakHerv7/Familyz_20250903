@@ -37,40 +37,57 @@ let FamilyController = class FamilyController {
     }
     async addMemberToFamily(user, familyId, addMemberDto) {
         await this.familyService.addMemberToFamily(user, familyId, addMemberDto);
-        return { success: true, message: 'Member added to family successfully' };
+        return { success: true, message: "Member added to family successfully" };
     }
     async updateFamilyMembership(user, familyId, memberId, updateDto) {
         await this.familyService.updateFamilyMembership(user, familyId, memberId, updateDto);
-        return { success: true, message: 'Membership updated successfully' };
+        return { success: true, message: "Membership updated successfully" };
     }
     async removeMemberFromFamily(user, familyId, memberId) {
         await this.familyService.removeMemberFromFamily(user, familyId, memberId);
-        return { success: true, message: 'Member removed from family successfully' };
+        return {
+            success: true,
+            message: "Member removed from family successfully",
+        };
     }
     async recalculateSubFamilyMemberships(user, familyId) {
         await this.familyService.recalculateSubFamilyMemberships(familyId);
-        return { success: true, message: 'Sub-family memberships recalculated successfully' };
+        return {
+            success: true,
+            message: "Sub-family memberships recalculated successfully",
+        };
+    }
+    async softDeleteFamily(user, familyId) {
+        await this.familyService.softDeleteFamily(user, familyId);
+        return { success: true, message: "Family deleted successfully" };
+    }
+    async restoreFamily(user, familyId) {
+        await this.familyService.restoreFamily(user, familyId);
+        return { success: true, message: "Family restored successfully" };
     }
     async deleteFamily(user, familyId) {
         await this.familyService.deleteFamily(user, familyId);
-        return { success: true, message: 'Family deleted successfully' };
+        return {
+            success: true,
+            message: "Family permanently deleted successfully",
+        };
     }
 };
 exports.FamilyController = FamilyController;
 __decorate([
     (0, common_1.Post)(),
     (0, swagger_1.ApiOperation)({
-        summary: 'Create new family',
-        description: 'Create a new family or sub-family',
+        summary: "Create new family",
+        description: "Create a new family or sub-family",
     }),
     (0, swagger_1.ApiResponse)({
         status: 201,
-        description: 'Family created successfully',
+        description: "Family created successfully",
         type: family_dto_1.FamilyResponseDto,
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied',
+        description: "Access denied",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
@@ -81,12 +98,12 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get my families',
-        description: 'Get all families the current user is a member of',
+        summary: "Get my families",
+        description: "Get all families the current user is a member of",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Families retrieved successfully',
+        description: "Families retrieved successfully",
         type: [family_dto_1.FamilyResponseDto],
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
@@ -95,161 +112,201 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], FamilyController.prototype, "getMyFamilies", null);
 __decorate([
-    (0, common_1.Get)(':id'),
+    (0, common_1.Get)(":id"),
     (0, swagger_1.ApiOperation)({
-        summary: 'Get family details',
-        description: 'Get detailed information about a specific family including members',
+        summary: "Get family details",
+        description: "Get detailed information about a specific family including members",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Family details retrieved successfully',
+        description: "Family details retrieved successfully",
         type: family_dto_1.FamilyWithMembersDto,
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Access denied to this family',
+        description: "Access denied to this family",
     }),
     (0, swagger_1.ApiResponse)({
         status: 404,
-        description: 'Family not found',
+        description: "Family not found",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)("id")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], FamilyController.prototype, "getFamilyDetails", null);
 __decorate([
-    (0, common_1.Put)(':id'),
+    (0, common_1.Put)(":id"),
     (0, swagger_1.ApiOperation)({
-        summary: 'Update family',
-        description: 'Update family information (requires admin access)',
+        summary: "Update family",
+        description: "Update family information (requires admin access)",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Family updated successfully',
+        description: "Family updated successfully",
         type: family_dto_1.FamilyResponseDto,
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Admin access required',
+        description: "Admin access required",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)("id")),
     __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String, family_dto_1.UpdateFamilyDto]),
     __metadata("design:returntype", Promise)
 ], FamilyController.prototype, "updateFamily", null);
 __decorate([
-    (0, common_1.Post)(':id/members'),
+    (0, common_1.Post)(":id/members"),
     (0, swagger_1.ApiOperation)({
-        summary: 'Add member to family',
-        description: 'Add a member to the family (requires admin access)',
+        summary: "Add member to family",
+        description: "Add a member to the family (requires admin access)",
     }),
     (0, swagger_1.ApiResponse)({
         status: 201,
-        description: 'Member added successfully',
+        description: "Member added successfully",
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Admin access required',
+        description: "Admin access required",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)("id")),
     __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String, family_dto_1.AddMemberToFamilyDto]),
     __metadata("design:returntype", Promise)
 ], FamilyController.prototype, "addMemberToFamily", null);
 __decorate([
-    (0, common_1.Patch)(':id/members/:memberId'),
+    (0, common_1.Patch)(":id/members/:memberId"),
     (0, swagger_1.ApiOperation)({
-        summary: 'Update family membership',
-        description: 'Update a member\'s role and status in the family (requires admin access)',
+        summary: "Update family membership",
+        description: "Update a member's role and status in the family (requires admin access)",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Membership updated successfully',
+        description: "Membership updated successfully",
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Admin access required',
+        description: "Admin access required",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id')),
-    __param(2, (0, common_1.Param)('memberId')),
+    __param(1, (0, common_1.Param)("id")),
+    __param(2, (0, common_1.Param)("memberId")),
     __param(3, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String, String, family_dto_1.UpdateFamilyMembershipDto]),
     __metadata("design:returntype", Promise)
 ], FamilyController.prototype, "updateFamilyMembership", null);
 __decorate([
-    (0, common_1.Delete)(':id/members/:memberId'),
+    (0, common_1.Delete)(":id/members/:memberId"),
     (0, swagger_1.ApiOperation)({
-        summary: 'Remove member from family',
-        description: 'Remove a member from the family (requires admin access)',
+        summary: "Remove member from family",
+        description: "Remove a member from the family (requires admin access)",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Member removed successfully',
+        description: "Member removed successfully",
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Admin access required',
+        description: "Admin access required",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id')),
-    __param(2, (0, common_1.Param)('memberId')),
+    __param(1, (0, common_1.Param)("id")),
+    __param(2, (0, common_1.Param)("memberId")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", Promise)
 ], FamilyController.prototype, "removeMemberFromFamily", null);
 __decorate([
-    (0, common_1.Post)(':id/subfamily/recalculate'),
+    (0, common_1.Post)(":id/subfamily/recalculate"),
     (0, swagger_1.ApiOperation)({
-        summary: 'Recalculate sub-family memberships',
-        description: 'Automatically recalculate sub-family memberships based on relationships',
+        summary: "Recalculate sub-family memberships",
+        description: "Automatically recalculate sub-family memberships based on relationships",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Sub-family memberships recalculated successfully',
+        description: "Sub-family memberships recalculated successfully",
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Admin access required',
+        description: "Admin access required",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)("id")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], FamilyController.prototype, "recalculateSubFamilyMemberships", null);
 __decorate([
-    (0, common_1.Delete)(':id'),
+    (0, common_1.Delete)(":id"),
     (0, swagger_1.ApiOperation)({
-        summary: 'Delete family',
-        description: 'Delete a family (only creator can delete)',
+        summary: "Soft delete family",
+        description: "Soft delete a family (only creator can delete)",
     }),
     (0, swagger_1.ApiResponse)({
         status: 200,
-        description: 'Family deleted successfully',
+        description: "Family soft deleted successfully",
     }),
     (0, swagger_1.ApiResponse)({
         status: 403,
-        description: 'Only creator can delete family',
+        description: "Only creator can delete family",
     }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)("id")),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], FamilyController.prototype, "softDeleteFamily", null);
+__decorate([
+    (0, common_1.Post)(":id/restore"),
+    (0, swagger_1.ApiOperation)({
+        summary: "Restore family",
+        description: "Restore a soft deleted family (only creator can restore)",
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: "Family restored successfully",
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 403,
+        description: "Only creator can restore family",
+    }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)("id")),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], FamilyController.prototype, "restoreFamily", null);
+__decorate([
+    (0, common_1.Delete)(":id/hard"),
+    (0, swagger_1.ApiOperation)({
+        summary: "Hard delete family",
+        description: "Permanently delete a family (only creator can delete)",
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 200,
+        description: "Family hard deleted successfully",
+    }),
+    (0, swagger_1.ApiResponse)({
+        status: 403,
+        description: "Only creator can delete family",
+    }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)("id")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], FamilyController.prototype, "deleteFamily", null);
 exports.FamilyController = FamilyController = __decorate([
-    (0, swagger_1.ApiTags)('Families'),
+    (0, swagger_1.ApiTags)("Families"),
     (0, swagger_1.ApiBearerAuth)(),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, common_1.Controller)('families'),
+    (0, common_1.Controller)("families"),
     __metadata("design:paramtypes", [family_service_1.FamilyService])
 ], FamilyController);
 //# sourceMappingURL=family.controller.js.map

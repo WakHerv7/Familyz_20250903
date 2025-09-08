@@ -46,7 +46,7 @@ export declare class ExportService {
         column: number;
         value: string;
     }[]>;
-    getFolderTreeDataWithIds(memberId: string): Promise<{
+    getFolderTreeDataWithIds(memberId: string, familyId?: string): Promise<{
         column: number;
         value: string;
         memberIds: {
@@ -55,7 +55,16 @@ export declare class ExportService {
             gender: string;
         }[];
     }[]>;
-    getFolderTreeData(memberId: string): Promise<FolderTreeExportData>;
+    getFamilyFolderTreeData(memberId: string, familyId: string): Promise<{
+        column: number;
+        value: string;
+        memberIds: {
+            id: string;
+            name: string;
+            gender: string;
+        }[];
+    }[]>;
+    getFolderTreeData(memberId: string, familyId?: string): Promise<FolderTreeExportData>;
     exportFamilyData(memberId: string, exportRequest: ExportRequest): Promise<{
         downloadUrl: string;
         filename: string;
@@ -72,6 +81,7 @@ export declare class ExportService {
     private getRelationshipLabel;
     private normalizeRelationships;
     private generateExcelTreeFormatWithIds;
+    private generateFamilyExcelTreeFormatWithIds;
     private generateExcelTreeFormat;
     private generateExcel;
 }

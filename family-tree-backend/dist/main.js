@@ -5,6 +5,7 @@ const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const config_1 = require("@nestjs/config");
 const path_1 = require("path");
+const express = require("express");
 const app_module_1 = require("./app.module");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
@@ -28,6 +29,8 @@ async function bootstrap() {
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
     });
+    app.use(express.json({ limit: "50mb" }));
+    app.use(express.urlencoded({ limit: "50mb", extended: true }));
     app.useStaticAssets((0, path_1.join)(__dirname, "..", "uploads"), {
         prefix: "/uploads/",
     });

@@ -46,6 +46,12 @@ __decorate([
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], CreateFamilyDto.prototype, "headOfFamilyId", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateFamilyDto.prototype, "addCreatorAsMember", void 0);
 class UpdateFamilyDto {
 }
 exports.UpdateFamilyDto = UpdateFamilyDto;

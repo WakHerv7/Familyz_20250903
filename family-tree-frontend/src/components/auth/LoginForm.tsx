@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { useLogin } from "@/hooks/api";
+import { useLogin } from "@/hooks/useAuth";
 import { loginSchema, LoginFormData } from "@/schemas/auth";
 import { ClipLoader } from "react-spinners";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
@@ -77,6 +77,7 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
   });
 
   const onSubmit = (data: LoginFormData) => {
+    console.log("[LoginForm] onSubmit called with data:", data);
     loginMutation.mutate({
       emailOrPhone: data.emailOrPhone,
       password: data.password,

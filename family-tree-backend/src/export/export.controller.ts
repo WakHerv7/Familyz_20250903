@@ -7,12 +7,14 @@ import {
   Request,
   Res,
   Param,
+  Query,
   BadRequestException,
 } from "@nestjs/common";
 import { Response } from "express";
 import * as path from "path";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ExportService } from "./export.service";
+import { TreeDataService } from "@/common/services/treeData.service";
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -71,7 +73,10 @@ interface FolderTreeExportData {
 
 @Controller("export")
 export class ExportController {
-  constructor(private exportService: ExportService) {}
+  constructor(
+    private exportService: ExportService,
+    private treeeDataService: TreeDataService
+  ) {}
 
   @Get("folder-tree-data")
   @UseGuards(JwtAuthGuard)
@@ -92,7 +97,9 @@ export class ExportController {
   @Get("folder-tree-data-with-ids")
   @UseGuards(JwtAuthGuard)
   async getFolderTreeDataWithIds(
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
+    @Param() params: any,
+    @Query("familyId") familyId?: string
   ): Promise<
     {
       column: number;
@@ -100,7 +107,31 @@ export class ExportController {
       memberIds: { id: string; name: string; gender: string }[];
     }[]
   > {
-    return await this.exportService.getFolderTreeDataWithIds(req.user.memberId);
+    return await this.exportService.getFolderTreeDataWithIds(
+      req.user.memberId,
+      familyId
+    );
+  }
+
+  @Get("family-folder-tree-data")
+  @UseGuards(JwtAuthGuard)
+  async getFamilyFolderTreeData(
+    @Request() req: AuthenticatedRequest,
+    @Query("familyId") familyId: string
+  ): Promise<
+    {
+      column: number;
+      value: string;
+      memberIds: { id: string; name: string; gender: string }[];
+    }[]
+  > {
+    if (!familyId) {
+      throw new BadRequestException("familyId is required");
+    }
+    return await this.treeeDataService.getFamilyFolderTreeData(
+      // req.user.memberId,
+      familyId
+    );
   }
 
   @Get("download/:filename")

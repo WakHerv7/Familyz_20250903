@@ -63,6 +63,11 @@ __decorate([
     (0, class_validator_1.IsEnum)(RelationshipType),
     __metadata("design:type", String)
 ], AddRelationshipDto.prototype, "relationshipType", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], AddRelationshipDto.prototype, "familyId", void 0);
 class RemoveRelationshipDto {
 }
 exports.RemoveRelationshipDto = RemoveRelationshipDto;
@@ -76,6 +81,11 @@ __decorate([
     (0, class_validator_1.IsEnum)(RelationshipType),
     __metadata("design:type", String)
 ], RemoveRelationshipDto.prototype, "relationshipType", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], RemoveRelationshipDto.prototype, "familyId", void 0);
 class BulkRelationshipDto {
 }
 exports.BulkRelationshipDto = BulkRelationshipDto;

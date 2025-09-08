@@ -17,9 +17,11 @@ import { Badge } from "@/components/ui/badge";
 // import FamilyMemberSelector from "@/components/FamilyMemberSelector";
 
 import {
-  useAddRelationship,
+  useAddRelationshipToMember,
   useRemoveRelationship,
   useFamilyMembers,
+  useAddRelationship,
+  useRemoveRelationshipToMember,
 } from "@/hooks/api";
 import {
   addRelationshipSchema,
@@ -45,7 +47,9 @@ export default function RelationshipManager({
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
   const addRelationshipMutation = useAddRelationship();
+  const addRelationshipToMemberMutation = useAddRelationshipToMember();
   const removeRelationshipMutation = useRemoveRelationship();
+  const removeRelationshipToMemberMutation = useRemoveRelationshipToMember();
 
   // Get family members for selection
   const { data: familyMembers = [] } = useFamilyMembers(
@@ -61,6 +65,11 @@ export default function RelationshipManager({
     formState: { errors },
   } = useForm<AddRelationshipFormData>({
     resolver: zodResolver(addRelationshipSchema),
+    defaultValues: {
+      relatedMemberId: "",
+      relationshipType: undefined,
+      familyId: currentMember.familyMemberships[0]?.familyId || "",
+    },
   });
 
   const relationshipType = watch("relationshipType");
@@ -85,30 +94,71 @@ export default function RelationshipManager({
       return;
     }
 
+    if (!data.relatedMemberId) {
+      toast.error(
+        "Member ID is missing. Please try selecting the member again."
+      );
+      return;
+    }
+
+    if (!data.relationshipType) {
+      toast.error("Please select a relationship type");
+      return;
+    }
+
+    const familyId = currentMember.familyMemberships[0]?.familyId;
+
+    const apiPayload = {
+      relatedMemberId: selectedMember.id,
+      relationshipType: data.relationshipType,
+      familyId: familyId,
+    };
+
     try {
-      await addRelationshipMutation.mutateAsync({
-        relatedMemberId: selectedMember.id,
-        relationshipType: data.relationshipType,
-      });
+      if (currentMember.id) {
+        await addRelationshipToMemberMutation.mutateAsync({
+          memberId: currentMember.id,
+          data: apiPayload,
+        });
+      } else {
+        await addRelationshipMutation.mutateAsync(apiPayload);
+      }
 
       // Reset form
-      reset();
+      reset({
+        relatedMemberId: "",
+        relationshipType: undefined,
+        familyId: currentMember.familyMemberships[0]?.familyId || "",
+      });
       setSelectedMember(null);
       onRelationshipChange?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to add relationship:", error);
+      toast.error("Failed to add relationship. Please try again.");
     }
   };
 
   const handleRemoveRelationship = async (
     memberId: string,
-    relationshipType: RelationshipType
+    relationshipType: RelationshipType,
+    currentMemberId?: string
   ) => {
+    const apiPayload = {
+      relatedMemberId: memberId,
+      relationshipType,
+      familyId: currentMember.familyMemberships[0]?.familyId || "",
+    };
+
     try {
-      await removeRelationshipMutation.mutateAsync({
-        relatedMemberId: memberId,
-        relationshipType,
-      });
+      if (currentMember.id) {
+        await removeRelationshipToMemberMutation.mutateAsync({
+          memberId: currentMember.id,
+          data: apiPayload,
+        });
+      } else {
+        await removeRelationshipMutation.mutateAsync(apiPayload);
+      }
+
       onRelationshipChange?.();
     } catch (error) {
       console.error("Failed to remove relationship:", error);
@@ -126,7 +176,15 @@ export default function RelationshipManager({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit(onSubmit, (validationErrors) => {
+                toast.error("Please fill in all required fields");
+              })(e);
+            }}
+            className="space-y-4"
+          >
             {/* Member Selection */}
             <div className="space-y-2">
               <Label>Select Family Member</Label>
@@ -140,7 +198,11 @@ export default function RelationshipManager({
                       }
                     : null
                 }
-                onChange={(option) => setSelectedMember(option?.member || null)}
+                onChange={(option) => {
+                  const member = option?.member || null;
+                  setSelectedMember(member);
+                  setValue("relatedMemberId", member?.id || "");
+                }}
                 options={getAvailableMembers().map((member) => ({
                   value: member.id,
                   label: member.name,
@@ -240,9 +302,9 @@ export default function RelationshipManager({
       </Card>
 
       {/* Current Relationships */}
-      {/* <Card>
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
+          <CardTitle className="flex items-center space-x-2 text-blue-800">
             <Users className="h-5 w-5" />
             <span>Current Relationships</span>
           </CardTitle>
@@ -251,28 +313,52 @@ export default function RelationshipManager({
           <div className="space-y-4">
             {currentMember.parents && currentMember.parents.length > 0 && (
               <div>
-                <h4 className="font-medium text-sm mb-2 text-gray-700">Parents</h4>
+                <h4 className="font-medium text-sm mb-2 text-gray-700">
+                  Parents
+                </h4>
                 <div className="space-y-2">
                   {currentMember.parents.map((parent) => (
-                    <div key={parent.id} className="flex items-center justify-between p-2 border rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {getInitials(parent.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                    <div
+                      key={parent.id}
+                      className="flex items-center justify-between p-3 border rounded-lg bg-white"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <span className="text-sm font-medium text-blue-600">
+                            {parent.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()}
+                          </span>
+                        </div>
                         <div>
                           <p className="font-medium text-sm">{parent.name}</p>
-                          <Badge variant="outline" className="text-xs">Parent</Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+                          >
+                            Parent
+                          </Badge>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveRelationship(parent.id, RelationshipType.PARENT)}
+                        onClick={() =>
+                          handleRemoveRelationship(
+                            parent.id,
+                            RelationshipType.PARENT
+                          )
+                        }
                         disabled={removeRelationshipMutation.isPending}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       >
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        {removeRelationshipMutation.isPending ? (
+                          <ClipLoader size={14} color="#ef4444" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   ))}
@@ -282,28 +368,52 @@ export default function RelationshipManager({
 
             {currentMember.spouses && currentMember.spouses.length > 0 && (
               <div>
-                <h4 className="font-medium text-sm mb-2 text-gray-700">Spouses</h4>
+                <h4 className="font-medium text-sm mb-2 text-gray-700">
+                  Spouses
+                </h4>
                 <div className="space-y-2">
                   {currentMember.spouses.map((spouse) => (
-                    <div key={spouse.id} className="flex items-center justify-between p-2 border rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {getInitials(spouse.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                    <div
+                      key={spouse.id}
+                      className="flex items-center justify-between p-3 border rounded-lg bg-white"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="h-8 w-8 rounded-full bg-pink-100 flex items-center justify-center">
+                          <span className="text-sm font-medium text-pink-600">
+                            {spouse.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()}
+                          </span>
+                        </div>
                         <div>
                           <p className="font-medium text-sm">{spouse.name}</p>
-                          <Badge variant="outline" className="text-xs">Spouse</Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-pink-50 text-pink-700 border-pink-200"
+                          >
+                            Spouse
+                          </Badge>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveRelationship(spouse.id, RelationshipType.SPOUSE)}
+                        onClick={() =>
+                          handleRemoveRelationship(
+                            spouse.id,
+                            RelationshipType.SPOUSE
+                          )
+                        }
                         disabled={removeRelationshipMutation.isPending}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       >
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        {removeRelationshipMutation.isPending ? (
+                          <ClipLoader size={14} color="#ef4444" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   ))}
@@ -313,28 +423,52 @@ export default function RelationshipManager({
 
             {currentMember.children && currentMember.children.length > 0 && (
               <div>
-                <h4 className="font-medium text-sm mb-2 text-gray-700">Children</h4>
+                <h4 className="font-medium text-sm mb-2 text-gray-700">
+                  Children
+                </h4>
                 <div className="space-y-2">
                   {currentMember.children.map((child) => (
-                    <div key={child.id} className="flex items-center justify-between p-2 border rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {getInitials(child.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                    <div
+                      key={child.id}
+                      className="flex items-center justify-between p-3 border rounded-lg bg-white"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                          <span className="text-sm font-medium text-green-600">
+                            {child.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()}
+                          </span>
+                        </div>
                         <div>
                           <p className="font-medium text-sm">{child.name}</p>
-                          <Badge variant="outline" className="text-xs">Child</Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-green-50 text-green-700 border-green-200"
+                          >
+                            Child
+                          </Badge>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveRelationship(child.id, RelationshipType.CHILD)}
+                        onClick={() =>
+                          handleRemoveRelationship(
+                            child.id,
+                            RelationshipType.CHILD
+                          )
+                        }
                         disabled={removeRelationshipMutation.isPending}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       >
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        {removeRelationshipMutation.isPending ? (
+                          <ClipLoader size={14} color="#ef4444" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   ))}
@@ -343,17 +477,20 @@ export default function RelationshipManager({
             )}
 
             {(!currentMember.parents || currentMember.parents.length === 0) &&
-             (!currentMember.spouses || currentMember.spouses.length === 0) &&
-             (!currentMember.children || currentMember.children.length === 0) && (
-              <div className="text-center py-8 text-gray-500">
-                <Users className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                <p>No relationships added yet.</p>
-                <p className="text-sm">Use the form above to connect with family members.</p>
-              </div>
-            )}
+              (!currentMember.spouses || currentMember.spouses.length === 0) &&
+              (!currentMember.children ||
+                currentMember.children.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  <Users className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                  <p>No relationships added yet.</p>
+                  <p className="text-sm">
+                    Use the form above to connect with family members.
+                  </p>
+                </div>
+              )}
           </div>
         </CardContent>
-      </Card> */}
+      </Card>
     </div>
   );
 }

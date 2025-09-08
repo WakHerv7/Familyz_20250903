@@ -1,7 +1,7 @@
 "use client";
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState, useEffect } from "react";
+import { useCreateMember, useFamilyMembers } from "@/hooks/api";
 import {
   CustomDialog,
   CustomDialogContent,
@@ -13,6 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -20,784 +22,747 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-
-import { useCreateMember, useFamilies, useFamilyMembers } from "@/hooks/api";
-import { createMemberSchema, CreateMemberFormData } from "@/schemas/member";
 import {
-  Gender,
-  MemberStatus,
-  FamilyRole,
-  RelationshipType,
-  Member,
-  CreateMemberRequest,
-} from "@/types";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ClipLoader } from "react-spinners";
-import { useAppSelector } from "@/hooks/redux";
-import { Plus, Trash2, Users, Heart, Mail, Send, UserPlus } from "lucide-react";
-import { useState, useEffect } from "react";
+import {
+  UserPlus,
+  Calendar,
+  MapPin,
+  Briefcase,
+  Mail,
+  Phone,
+  Heart,
+  Plus,
+  X,
+  MoreHorizontal,
+} from "lucide-react";
+import { Gender, MemberStatus, FamilyRole, RelationshipType } from "@/types";
 import toast from "react-hot-toast";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import ReactSelect from "react-select";
 
 interface AddFamilyMemberDialogProps {
+  familyId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialRelationship?: {
-    type: "parent" | "spouse" | "child" | null;
-    member: { id: string; name: string } | null;
-  };
-}
-
-interface RelationshipEntry {
-  relatedMemberId: string;
-  relatedMemberName: string;
-  relationshipType: RelationshipType;
-}
-
-interface CreateMemberForm {
-  name: string;
-  gender?: Gender;
-  status?: MemberStatus;
-  familyId: string;
-  role?: FamilyRole;
-  personalInfo?: {
-    bio?: string;
-    birthDate?: string;
-    birthPlace?: string;
-    occupation?: string;
-    phoneNumber?: string;
-    email?: string;
-  };
+  onSuccess?: () => void;
+  preSelectedRelationship?: {
+    type: "parent" | "spouse" | "child";
+    member: {
+      id: string;
+      name: string;
+    };
+  } | null;
 }
 
 export default function AddFamilyMemberDialog({
+  familyId,
   open,
   onOpenChange,
-  initialRelationship,
+  onSuccess,
+  preSelectedRelationship,
 }: AddFamilyMemberDialogProps) {
-  const { user } = useAppSelector((state) => state.auth);
-  const { data: families = [] } = useFamilies();
-  const createMemberMutation = useCreateMember();
+  const createMember = useCreateMember();
+  const { data: familyMembers } = useFamilyMembers(familyId || "");
 
-  const [relationships, setRelationships] = useState<RelationshipEntry[]>([]);
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [relationshipType, setRelationshipType] =
-    useState<RelationshipType | null>(null);
-  const [sendInvitation, setSendInvitation] = useState(false);
-  const [invitationPermissions, setInvitationPermissions] = useState<string[]>([
-    "view_tree",
-    "edit_own_profile",
-  ]);
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm<CreateMemberForm>({
-    defaultValues: {
-      name: "",
-      gender: Gender.PREFER_NOT_TO_SAY,
-      status: MemberStatus.ACTIVE,
-      familyId: families.length > 0 ? families[0].id : "",
-      role: FamilyRole.MEMBER,
-    },
-    mode: "onChange",
+  const [formData, setFormData] = useState({
+    name: "",
+    gender: "" as Gender | "",
+    status: MemberStatus.ACTIVE,
+    role: FamilyRole.MEMBER,
+    bio: "",
+    birthDate: "",
+    birthPlace: "",
+    occupation: "",
+    phoneNumber: "",
+    email: "",
   });
 
-  const selectedFamilyId = watch("familyId");
-  const { data: familyMembers = [], isLoading: familyMembersLoading } =
-    useFamilyMembers(selectedFamilyId || "");
+  const [relationships, setRelationships] = useState<
+    Array<{
+      id: string;
+      relatedMemberId: string;
+      relationshipType: RelationshipType;
+      relatedMember: any;
+    }>
+  >([]);
 
-  // Pre-populate relationships when initialRelationship is provided
+  const [showAddRelationship, setShowAddRelationship] = useState(false);
+  const [newRelationship, setNewRelationship] = useState({
+    relatedMemberId: "",
+    relationshipType: "" as RelationshipType | "",
+  });
+
+  // Reset form when dialog opens
   useEffect(() => {
-    if (initialRelationship?.member && initialRelationship?.type && open) {
-      const relationshipTypeMap = {
-        parent: RelationshipType.CHILD, // If adding a parent, the new member is the child
-        spouse: RelationshipType.SPOUSE,
-        child: RelationshipType.PARENT, // If adding a child, the new member is the parent
-      };
+    if (open) {
+      setFormData({
+        name: "",
+        gender: "",
+        status: MemberStatus.ACTIVE,
+        role: FamilyRole.MEMBER,
+        bio: "",
+        birthDate: "",
+        birthPlace: "",
+        occupation: "",
+        phoneNumber: "",
+        email: "",
+      });
+      setRelationships([]);
+      setShowAddRelationship(false);
+      setNewRelationship({
+        relatedMemberId: "",
+        relationshipType: "",
+      });
+    }
+  }, [open]);
 
-      const mappedType = relationshipTypeMap[initialRelationship.type];
-      if (mappedType) {
-        const initialRelationshipEntry: RelationshipEntry = {
-          relatedMemberId: initialRelationship.member.id,
-          relatedMemberName: initialRelationship.member.name,
-          relationshipType: mappedType,
+  // Pre-populate spouse relationship when dialog opens with preSelectedRelationship
+  useEffect(() => {
+    if (open && preSelectedRelationship && familyMembers) {
+      const relatedMember = familyMembers.find(
+        (member) => member.id === preSelectedRelationship.member.id
+      );
+
+      if (relatedMember) {
+        const relationshipType =
+          preSelectedRelationship.type === "spouse"
+            ? RelationshipType.SPOUSE
+            : preSelectedRelationship.type === "parent"
+            ? RelationshipType.PARENT
+            : RelationshipType.CHILD;
+
+        const relationship = {
+          id: `preselected-${Date.now()}`,
+          relatedMemberId: preSelectedRelationship.member.id,
+          relationshipType,
+          relatedMember,
         };
 
-        setRelationships([initialRelationshipEntry]);
+        setRelationships([relationship]);
+        toast.success(
+          `Pre-selected ${preSelectedRelationship.type} relationship added`
+        );
       }
     }
-  }, [initialRelationship, open]);
+  }, [open, preSelectedRelationship, familyMembers]);
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  const handleAddRelationship = () => {
+    if (!newRelationship.relatedMemberId || !newRelationship.relationshipType) {
+      toast.error("Please select both a family member and relationship type");
+      return;
+    }
 
-  const getAvailableMembers = () => {
-    const existingRelationshipIds = new Set(
-      relationships.map((r) => r.relatedMemberId)
+    const relatedMember = familyMembers?.find(
+      (member) => member.id === newRelationship.relatedMemberId
     );
 
-    return familyMembers.filter(
-      (member) => !existingRelationshipIds.has(member.id)
+    if (!relatedMember) {
+      toast.error("Selected family member not found");
+      return;
+    }
+
+    // Check if relationship already exists
+    const existingRelationship = relationships.find(
+      (rel) =>
+        rel.relatedMemberId === newRelationship.relatedMemberId &&
+        rel.relationshipType === newRelationship.relationshipType
     );
-  };
 
-  const addRelationship = () => {
-    if (!selectedMember || !relationshipType) return;
+    if (existingRelationship) {
+      toast.error("This relationship already exists");
+      return;
+    }
 
-    const newRelationship: RelationshipEntry = {
-      relatedMemberId: selectedMember.id,
-      relatedMemberName: selectedMember.name,
-      relationshipType,
+    const relationship = {
+      id: `temp-${Date.now()}`,
+      relatedMemberId: newRelationship.relatedMemberId,
+      relationshipType: newRelationship.relationshipType as RelationshipType,
+      relatedMember,
     };
 
-    setRelationships((prev) => [...prev, newRelationship]);
-    setSelectedMember(null);
-    setRelationshipType(null);
+    setRelationships((prev) => [...prev, relationship]);
+    setNewRelationship({
+      relatedMemberId: "",
+      relationshipType: "",
+    });
+    setShowAddRelationship(false);
+    toast.success("Relationship added");
   };
 
-  const removeRelationship = (index: number) => {
-    setRelationships((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveRelationship = (relationshipId: string) => {
+    setRelationships((prev) => prev.filter((rel) => rel.id !== relationshipId));
+    toast.success("Relationship removed");
   };
 
   const getRelationshipTypeLabel = (type: RelationshipType) => {
-    switch (type) {
-      case RelationshipType.PARENT:
-        return "Parent";
-      case RelationshipType.CHILD:
-        return "Child";
-      case RelationshipType.SPOUSE:
-        return "Spouse";
-      default:
-        return type;
-    }
+    const labels = {
+      PARENT: "Parent",
+      CHILD: "Child",
+      SPOUSE: "Spouse",
+      SIBLING: "Sibling",
+      GRANDPARENT: "Grandparent",
+      GRANDCHILD: "Grandchild",
+      AUNT_UNCLE: "Aunt/Uncle",
+      NIECE_NEPHEW: "Niece/Nephew",
+      COUSIN: "Cousin",
+      IN_LAW: "In-law",
+      OTHER: "Other",
+    };
+    return labels[type] || type;
   };
 
-  const onSubmit = async (data: CreateMemberForm) => {
-    // Validate required fields
-    if (!data.name?.trim()) {
-      toast.error("Name is required");
+  const availableMembers =
+    familyMembers?.filter(
+      (member) =>
+        !relationships.some((rel) => rel.relatedMemberId === member.id)
+    ) || [];
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name.trim()) {
+      toast.error("Please enter a name for the family member");
       return;
     }
 
-    if (!data.familyId) {
-      toast.error("Please select a family");
-      return;
-    }
-
-    // Validate invitation requirements
-    if (sendInvitation && !data.personalInfo?.email) {
-      toast.error("Email is required to send invitation");
+    if (!familyId) {
+      toast.error("No family selected. Please select a family first.");
       return;
     }
 
     try {
-      const submitData: CreateMemberRequest = {
-        name: data.name.trim(),
-        gender: data.gender,
-        status: data.status || MemberStatus.ACTIVE,
-        role: data.role || FamilyRole.MEMBER,
-        familyId: data.familyId,
-        personalInfo: data.personalInfo
-          ? {
-              bio: data.personalInfo.bio?.trim() || undefined,
-              birthDate: data.personalInfo.birthDate || undefined,
-              birthPlace: data.personalInfo.birthPlace?.trim() || undefined,
-              occupation: data.personalInfo.occupation?.trim() || undefined,
-              phoneNumber: data.personalInfo.phoneNumber?.trim() || undefined,
-              email: data.personalInfo.email?.trim() || undefined,
-            }
-          : undefined,
+      await createMember.mutateAsync({
+        name: formData.name.trim(),
+        gender: formData.gender as Gender,
+        status: formData.status as MemberStatus,
+        role: formData.role as FamilyRole,
+        familyId,
+        personalInfo: {
+          bio: formData.bio.trim() || undefined,
+          birthDate: formData.birthDate
+            ? new Date(formData.birthDate).toISOString()
+            : undefined,
+          birthPlace: formData.birthPlace.trim() || undefined,
+          occupation: formData.occupation.trim() || undefined,
+          phoneNumber: formData.phoneNumber.trim() || undefined,
+          email: formData.email.trim() || undefined,
+        },
         initialRelationships:
           relationships.length > 0
             ? relationships.map((rel) => ({
                 relatedMemberId: rel.relatedMemberId,
                 relationshipType: rel.relationshipType,
+                familyId,
               }))
             : undefined,
-      };
+      });
 
-      console.log("Submitting member data:", submitData);
-      const createdMember = await createMemberMutation.mutateAsync(submitData);
-
-      // Send invitation if requested
-      if (sendInvitation && data.personalInfo?.email) {
-        try {
-          // Here you would call the invitation API
-          // For now, we'll just show a success message
-          console.log("Sending invitation to:", data.personalInfo.email);
-          console.log("With permissions:", invitationPermissions);
-
-          toast.success(
-            `Member created and invitation sent to ${data.personalInfo.email}!`
-          );
-        } catch (invitationError) {
-          console.error("Failed to send invitation:", invitationError);
-          toast.error("Member created but failed to send invitation");
-        }
-      } else {
-        toast.success("Family member created successfully!");
-      }
-
-      // Close dialog and reset form
+      toast.success("Family member added successfully!");
       onOpenChange(false);
-      reset();
-      setRelationships([]);
-      setSendInvitation(false);
-      setInvitationPermissions(["view_tree", "edit_own_profile"]);
+      onSuccess?.();
     } catch (error) {
-      console.error("Failed to create member:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to create family member"
-      );
+      toast.error("Failed to add family member");
+      console.error("Add member error:", error);
     }
   };
 
-  const handleClose = () => {
-    onOpenChange(false);
-    reset();
-    setRelationships([]);
-    setSelectedMember(null);
-    setRelationshipType(null);
-    setSendInvitation(false);
-    setInvitationPermissions(["view_tree", "edit_own_profile"]);
-  };
-
   return (
-    <CustomDialog open={open} onOpenChange={handleClose}>
-      <CustomDialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+    <CustomDialog open={open} onOpenChange={onOpenChange}>
+      <CustomDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <CustomDialogHeader>
-          <CustomDialogTitle className="flex items-center space-x-2">
-            <UserPlus className="h-5 w-5 text-green-600" />
-            <span className="text-green-800">Add Family Member</span>
+          <CustomDialogTitle className="text-2xl font-bold text-gray-900 flex items-center">
+            <UserPlus className="h-6 w-6 mr-2 text-green-600" />
+            Add Family Member
           </CustomDialogTitle>
           <CustomDialogDescription>
-            Create a new family member and establish their relationships.
-            Optionally send them an invitation to join the platform.
+            Add a new member to this family with their personal information
           </CustomDialogDescription>
-          <CustomDialogClose onClick={handleClose} />
+          <CustomDialogClose onClick={() => onOpenChange(false)} />
         </CustomDialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Family Selection */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center space-x-2">
-                <Users className="h-4 w-4" />
-                <span>Family Selection</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="familyId">Select Family *</Label>
-                <Select
-                  onValueChange={(value) => {
-                    setValue("familyId", value, { shouldValidate: true });
-                    setRelationships([]); // Clear relationships when family changes
-                  }}
-                  defaultValue={families.length > 0 ? families[0].id : ""}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a family" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {families.map((family) => (
-                      <SelectItem key={family.id} value={family.id}>
-                        {family.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.familyId && (
-                  <p className="text-red-500 text-sm">
-                    {errors.familyId.message}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center space-x-2">
-                <UserPlus className="h-4 w-4" />
-                <span>Basic Information</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name *</Label>
-                  <Input
-                    id="name"
-                    {...register("name", {
-                      required: "Name is required",
-                      minLength: { value: 1, message: "Name cannot be empty" },
-                    })}
-                    placeholder="Enter full name"
-                  />
-                  {errors.name && (
-                    <p className="text-red-500 text-sm">
-                      {errors.name.message}
-                    </p>
-                  )}
-                </div>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Basic Information
+            </h3>
 
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Gender</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      setValue("gender", value as Gender)
-                    }
-                    defaultValue={Gender.PREFER_NOT_TO_SAY}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={Gender.PREFER_NOT_TO_SAY}>
-                        Prefer not to say
-                      </SelectItem>
-                      <SelectItem value={Gender.MALE}>Male</SelectItem>
-                      <SelectItem value={Gender.FEMALE}>Female</SelectItem>
-                      <SelectItem value={Gender.OTHER}>Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      setValue("status", value as MemberStatus)
-                    }
-                    defaultValue={MemberStatus.ACTIVE}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={MemberStatus.ACTIVE}>
-                        Active
-                      </SelectItem>
-                      <SelectItem value={MemberStatus.INACTIVE}>
-                        Inactive
-                      </SelectItem>
-                      <SelectItem value={MemberStatus.DECEASED}>
-                        Deceased
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="role">Family Role</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      setValue("role", value as FamilyRole)
-                    }
-                    defaultValue={FamilyRole.MEMBER}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={FamilyRole.MEMBER}>Member</SelectItem>
-                      <SelectItem value={FamilyRole.ADMIN}>Admin</SelectItem>
-                      <SelectItem value={FamilyRole.HEAD}>Head</SelectItem>
-                      <SelectItem value={FamilyRole.VIEWER}>Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Initial Relationships */}
-          {selectedFamilyId && (
-            <Card className="border-green-200 bg-green-50/30">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center space-x-2 text-green-800">
-                  <Heart className="h-5 w-5 text-green-600" />
-                  <span>Initial Relationships (Optional)</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {familyMembersLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <ClipLoader size={24} color="#16a34a" />
-                    <span className="ml-2 text-sm text-gray-600">
-                      Loading family members...
-                    </span>
-                  </div>
-                ) : (
-                  <>
-                    {/* Add Relationship Form */}
-                    <div className="space-y-3 p-3 border rounded-lg bg-gray-50">
-                      <div className="space-y-2">
-                        <Label>Select Family Member</Label>
-                        <ReactSelect
-                          value={
-                            selectedMember
-                              ? {
-                                  value: selectedMember.id,
-                                  label: selectedMember.name,
-                                  member: selectedMember,
-                                }
-                              : null
-                          }
-                          onChange={(option) => {
-                            setSelectedMember(option ? option.member : null);
-                          }}
-                          options={getAvailableMembers().map((member) => ({
-                            value: member.id,
-                            label: member.name,
-                            member: member,
-                          }))}
-                          formatOptionLabel={(option, { context }) => (
-                            <div className="flex items-center space-x-2">
-                              <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-xs">
-                                  {getInitials(option.member.name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span>{option.label}</span>
-                            </div>
-                          )}
-                          placeholder="Select a family member..."
-                          isClearable
-                          className="react-select-container"
-                          classNamePrefix="react-select"
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              border: "1px solid #d1d5db",
-                              borderRadius: "6px",
-                              minHeight: "40px",
-                              "&:hover": {
-                                borderColor: "#9ca3af",
-                              },
-                            }),
-                            option: (base, state) => ({
-                              ...base,
-                              backgroundColor: state.isSelected
-                                ? "#3b82f6"
-                                : state.isFocused
-                                ? "#eff6ff"
-                                : "white",
-                              color: state.isSelected ? "white" : "black",
-                              "&:hover": {
-                                backgroundColor: state.isSelected
-                                  ? "#2563eb"
-                                  : "#f3f4f6",
-                              },
-                            }),
-                          }}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Relationship Type</Label>
-                        <Select
-                          onValueChange={(value) =>
-                            setRelationshipType(value as RelationshipType)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select relationship type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={RelationshipType.PARENT}>
-                              {selectedMember?.name || "This person"} is the
-                              Parent
-                            </SelectItem>
-                            <SelectItem value={RelationshipType.CHILD}>
-                              {selectedMember?.name || "This person"} is the
-                              Child
-                            </SelectItem>
-                            <SelectItem value={RelationshipType.SPOUSE}>
-                              {selectedMember?.name || "This person"} is the
-                              Spouse
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <Button
-                        type="button"
-                        onClick={addRelationship}
-                        disabled={!selectedMember || !relationshipType}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Relationship
-                      </Button>
-                    </div>
-
-                    {/* Existing Relationships */}
-                    {relationships.length > 0 && (
-                      <div className="space-y-2">
-                        <Label>Added Relationships</Label>
-                        <div className="space-y-2">
-                          {relationships.map((relationship, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center justify-between p-2 border rounded-lg"
-                            >
-                              <div className="flex items-center space-x-2">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarFallback className="text-xs">
-                                    {getInitials(
-                                      relationship.relatedMemberName
-                                    )}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-medium text-sm">
-                                    {relationship.relatedMemberName}
-                                  </p>
-                                  <Badge variant="outline" className="text-xs">
-                                    {getRelationshipTypeLabel(
-                                      relationship.relationshipType
-                                    )}
-                                  </Badge>
-                                </div>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeRelationship(index)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Personal Information */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center space-x-2">
-                <UserPlus className="h-4 w-4" />
-                <span>Personal Information (Optional)</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="bio">Biography</Label>
-                <Textarea
-                  id="bio"
-                  {...register("personalInfo.bio")}
-                  placeholder="Brief biography or description"
-                  rows={3}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label
+                  htmlFor="name"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Full Name *
+                </Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  className="mt-1"
+                  placeholder="Enter full name"
+                  required
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="birthDate">Birth Date</Label>
-                  <Input
-                    id="birthDate"
-                    type="date"
-                    {...register("personalInfo.birthDate")}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="birthPlace">Birth Place</Label>
-                  <Input
-                    id="birthPlace"
-                    {...register("personalInfo.birthPlace")}
-                    placeholder="City, Country"
-                  />
-                </div>
+              <div>
+                <Label
+                  htmlFor="gender"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Gender
+                </Label>
+                <Select
+                  value={formData.gender}
+                  onValueChange={(value) => handleInputChange("gender", value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MALE">Male</SelectItem>
+                    <SelectItem value="FEMALE">Female</SelectItem>
+                    <SelectItem value="OTHER">Other</SelectItem>
+                    <SelectItem value="PREFER_NOT_TO_SAY">
+                      Prefer not to say
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="occupation">Occupation</Label>
-                  <Input
-                    id="occupation"
-                    {...register("personalInfo.occupation")}
-                    placeholder="Job title or profession"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Phone Number</Label>
-                  <Input
-                    id="phoneNumber"
-                    type="tel"
-                    {...register("personalInfo.phoneNumber")}
-                    placeholder="+1234567890"
-                  />
-                </div>
+              <div>
+                <Label
+                  htmlFor="status"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Status
+                </Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => handleInputChange("status", value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="INACTIVE">Inactive</SelectItem>
+                    <SelectItem value="DECEASED">Deceased</SelectItem>
+                    <SelectItem value="ARCHIVED">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+              <div>
+                <Label
+                  htmlFor="role"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Family Role
+                </Label>
+                <Select
+                  value={formData.role}
+                  onValueChange={(value) => handleInputChange("role", value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MEMBER">Member</SelectItem>
+                    <SelectItem value="HEAD">Head</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="VIEWER">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Personal Information */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Personal Information
+            </h3>
+
+            <div>
+              <Label
+                htmlFor="bio"
+                className="text-sm font-medium text-gray-700"
+              >
+                Bio
+              </Label>
+              <Textarea
+                id="bio"
+                value={formData.bio}
+                onChange={(e) => handleInputChange("bio", e.target.value)}
+                className="mt-1"
+                rows={3}
+                placeholder="Tell us about this person..."
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label
+                  htmlFor="birthDate"
+                  className="text-sm font-medium text-gray-700 flex items-center"
+                >
+                  <Calendar className="h-4 w-4 mr-2 text-green-600" />
+                  Birth Date
+                </Label>
+                <Input
+                  id="birthDate"
+                  type="date"
+                  value={formData.birthDate}
+                  onChange={(e) =>
+                    handleInputChange("birthDate", e.target.value)
+                  }
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label
+                  htmlFor="birthPlace"
+                  className="text-sm font-medium text-gray-700 flex items-center"
+                >
+                  <MapPin className="h-4 w-4 mr-2 text-red-600" />
+                  Birth Place
+                </Label>
+                <Input
+                  id="birthPlace"
+                  value={formData.birthPlace}
+                  onChange={(e) =>
+                    handleInputChange("birthPlace", e.target.value)
+                  }
+                  className="mt-1"
+                  placeholder="City, Country"
+                />
+              </div>
+
+              <div>
+                <Label
+                  htmlFor="occupation"
+                  className="text-sm font-medium text-gray-700 flex items-center"
+                >
+                  <Briefcase className="h-4 w-4 mr-2 text-purple-600" />
+                  Occupation
+                </Label>
+                <Input
+                  id="occupation"
+                  value={formData.occupation}
+                  onChange={(e) =>
+                    handleInputChange("occupation", e.target.value)
+                  }
+                  className="mt-1"
+                  placeholder="Job title or profession"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Information */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Contact Information
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label
+                  htmlFor="phoneNumber"
+                  className="text-sm font-medium text-gray-700 flex items-center"
+                >
+                  <Phone className="h-4 w-4 mr-2 text-blue-600" />
+                  Phone Number
+                </Label>
+                <Input
+                  id="phoneNumber"
+                  type="tel"
+                  value={formData.phoneNumber}
+                  onChange={(e) =>
+                    handleInputChange("phoneNumber", e.target.value)
+                  }
+                  className="mt-1"
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+
+              <div>
+                <Label
+                  htmlFor="email"
+                  className="text-sm font-medium text-gray-700 flex items-center"
+                >
+                  <Mail className="h-4 w-4 mr-2 text-orange-600" />
+                  Email Address
+                </Label>
                 <Input
                   id="email"
                   type="email"
-                  {...register("personalInfo.email")}
+                  value={formData.email}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
+                  className="mt-1"
                   placeholder="email@example.com"
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Invitation Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Mail className="h-5 w-5" />
-                <span>Send Invitation (Optional)</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Alert>
-                <Mail className="h-4 w-4" />
-                <AlertDescription>
-                  Send an invitation to allow this family member to join the
-                  platform and access the family tree.
-                </AlertDescription>
-              </Alert>
+          {/* Family Relationships */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <Heart className="h-5 w-5 mr-2 text-red-600" />
+                Family Relationships ({relationships.length})
+              </h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddRelationship(!showAddRelationship)}
+                className="flex items-center space-x-2"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Relationship</span>
+              </Button>
+            </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="sendInvitation"
-                  checked={sendInvitation}
-                  onCheckedChange={(checked) =>
-                    setSendInvitation(checked as boolean)
-                  }
-                />
-                <Label htmlFor="sendInvitation" className="text-sm font-medium">
-                  Send invitation email to this family member
-                </Label>
-              </div>
-
-              {sendInvitation && (
-                <div className="space-y-4 p-4 border rounded-lg bg-blue-50">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">
-                      Invitation Permissions
+            {/* Add Relationship Form */}
+            {showAddRelationship && (
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h4 className="font-medium text-gray-900 mb-3">
+                  Add New Relationship
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">
+                      Family Member
                     </Label>
-                    <p className="text-xs text-gray-600">
-                      Select what this member can do after joining:
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { key: "view_tree", label: "View Family Tree" },
-                        { key: "view_members", label: "View Members" },
-                        { key: "edit_own_profile", label: "Edit Own Profile" },
-                        { key: "add_members", label: "Add Members" },
-                        { key: "edit_members", label: "Edit Members" },
-                        { key: "send_messages", label: "Send Messages" },
-                      ].map((permission) => (
-                        <div
-                          key={permission.key}
-                          className="flex items-center space-x-2"
-                        >
-                          <Checkbox
-                            id={permission.key}
-                            checked={invitationPermissions.includes(
-                              permission.key
-                            )}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setInvitationPermissions((prev) => [
-                                  ...prev,
-                                  permission.key,
-                                ]);
-                              } else {
-                                setInvitationPermissions((prev) =>
-                                  prev.filter((p) => p !== permission.key)
-                                );
-                              }
-                            }}
-                          />
-                          <Label htmlFor={permission.key} className="text-xs">
-                            {permission.label}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
+                    <Select
+                      value={newRelationship.relatedMemberId}
+                      onValueChange={(value) =>
+                        setNewRelationship((prev) => ({
+                          ...prev,
+                          relatedMemberId: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select family member" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableMembers.map((member) => (
+                          <SelectItem key={member.id} value={member.id}>
+                            <div className="flex items-center">
+                              <div className="w-6 h-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center text-xs mr-2">
+                                {member.gender === "MALE"
+                                  ? "👨"
+                                  : member.gender === "FEMALE"
+                                  ? "👩"
+                                  : "🧑"}
+                              </div>
+                              <span>{member.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  <div className="flex items-center space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <Mail className="h-4 w-4 text-yellow-600" />
-                    <div className="text-sm">
-                      <p className="font-medium text-yellow-800">
-                        Invitation will be sent to:
-                      </p>
-                      <p className="text-yellow-700">
-                        {watch("personalInfo.email") ||
-                          "Please enter an email address above"}
-                      </p>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">
+                      Relationship Type
+                    </Label>
+                    <Select
+                      value={newRelationship.relationshipType}
+                      onValueChange={(value) =>
+                        setNewRelationship((prev) => ({
+                          ...prev,
+                          relationshipType: value as RelationshipType,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select relationship type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PARENT">Parent</SelectItem>
+                        <SelectItem value="CHILD">Child</SelectItem>
+                        <SelectItem value="SPOUSE">Spouse</SelectItem>
+                        <SelectItem value="SIBLING">Sibling</SelectItem>
+                        <SelectItem value="GRANDPARENT">Grandparent</SelectItem>
+                        <SelectItem value="GRANDCHILD">Grandchild</SelectItem>
+                        <SelectItem value="AUNT_UNCLE">Aunt/Uncle</SelectItem>
+                        <SelectItem value="NIECE_NEPHEW">
+                          Niece/Nephew
+                        </SelectItem>
+                        <SelectItem value="COUSIN">Cousin</SelectItem>
+                        <SelectItem value="IN_LAW">In-law</SelectItem>
+                        <SelectItem value="OTHER">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowAddRelationship(false);
+                      setNewRelationship({
+                        relatedMemberId: "",
+                        relationshipType: "",
+                      });
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddRelationship}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Add Relationship
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Relationships List */}
+            {relationships.length > 0 && (
+              <div className="space-y-2">
+                {relationships.map((relationship) => (
+                  <div
+                    key={relationship.id}
+                    className="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-200"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-green-100 to-blue-100 rounded-full flex items-center justify-center text-sm">
+                        {relationship.relatedMember.gender === "MALE"
+                          ? "👨"
+                          : relationship.relatedMember.gender === "FEMALE"
+                          ? "👩"
+                          : "🧑"}
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          {relationship.relatedMember.name}
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {getRelationshipTypeLabel(
+                            relationship.relationshipType
+                          )}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() =>
+                            handleRemoveRelationship(relationship.id)
+                          }
+                          className="text-red-600"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Remove Relationship
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {relationships.length === 0 && !showAddRelationship && (
+              <div className="text-center py-6 text-gray-500">
+                <Heart className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                <p>No relationships added yet</p>
+                <p className="text-sm">
+                  Click "Add Relationship" to get started
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Preview */}
+          {formData.name && (
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <h4 className="font-medium text-blue-900 mb-2 flex items-center">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Member Preview
+              </h4>
+              <div className="text-sm text-blue-700">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center text-sm">
+                    {formData.gender === "MALE"
+                      ? "👨"
+                      : formData.gender === "FEMALE"
+                      ? "👩"
+                      : "🧑"}
+                  </div>
+                  <div>
+                    <div className="font-medium">{formData.name}</div>
+                    <div className="text-xs">
+                      {formData.status} • {formData.role} •{" "}
+                      {formData.gender || "Not specified"}
                     </div>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                {relationships.length > 0 && (
+                  <div className="mt-2 text-xs">
+                    Relationships: {relationships.length} family member
+                    {relationships.length !== 1 ? "s" : ""}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-          {/* Form Actions */}
-          <div className="flex justify-end space-x-2 pt-4">
+          {/* Actions */}
+          <div className="flex justify-end space-x-3 pt-6 border-t">
             <Button
               type="button"
               variant="outline"
-              onClick={handleClose}
-              disabled={createMemberMutation.isPending}
+              onClick={() => onOpenChange(false)}
+              disabled={createMember.isPending}
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={createMemberMutation.isPending}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={createMember.isPending || !formData.name.trim()}
+              className="bg-green-600 hover:bg-green-700"
             >
-              {createMemberMutation.isPending ? (
-                <div className="flex items-center space-x-2">
-                  <ClipLoader size={16} color="white" />
-                  <span>
-                    {sendInvitation ? "Creating & Inviting..." : "Creating..."}
-                  </span>
-                </div>
-              ) : sendInvitation ? (
-                <div className="flex items-center space-x-2">
-                  <Send className="h-4 w-4" />
-                  <span>Add & Invite Member</span>
-                </div>
+              {createMember.isPending ? (
+                <>
+                  <ClipLoader size={16} color="#ffffff" className="mr-2" />
+                  Adding...
+                </>
               ) : (
-                "Create Member"
+                <>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Member
+                </>
               )}
             </Button>
           </div>
